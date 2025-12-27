@@ -26,6 +26,7 @@ export type Database = {
           mes: string | null
           nif_fornecedor: string | null
           numero_doc: string | null
+          sheet_link: string | null
           tipo: string | null
           total: number
         }
@@ -40,6 +41,7 @@ export type Database = {
           mes?: string | null
           nif_fornecedor?: string | null
           numero_doc?: string | null
+          sheet_link?: string | null
           tipo?: string | null
           total: number
         }
@@ -54,6 +56,7 @@ export type Database = {
           mes?: string | null
           nif_fornecedor?: string | null
           numero_doc?: string | null
+          sheet_link?: string | null
           tipo?: string | null
           total?: number
         }
