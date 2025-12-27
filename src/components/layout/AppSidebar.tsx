@@ -3,7 +3,6 @@ import {
   LayoutDashboard, 
   FileText, 
   Upload, 
-  Link2,
   Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -12,7 +11,6 @@ const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Faturas", href: "/faturas", icon: FileText },
   { name: "Upload", href: "/upload", icon: Upload },
-  { name: "Integrações", href: "/integracoes", icon: Link2 },
 ];
 
 export function AppSidebar() {

@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import NotFound from "./pages/NotFound";
 import Faturas from "./pages/Faturas";
 import Upload from "./pages/Upload";
-import Integracoes from "./pages/Integracoes";
 import Dashboard from "./pages/Dashboard";
 
 const queryClient = new QueryClient();
@@ -21,7 +20,6 @@ const App = () => (
           <Route path="/" element={<Dashboard />} />
           <Route path="/faturas" element={<Faturas />} />
           <Route path="/upload" element={<Upload />} />
-          <Route path="/integracoes" element={<Integracoes />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
