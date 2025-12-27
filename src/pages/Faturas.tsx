@@ -1,40 +1,27 @@
-import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState } from "react";
 import type { Documento } from "@/types/database";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { FaturaFilters } from "@/components/faturas/FaturaFilters";
 import { FaturasTable } from "@/components/faturas/FaturasTable";
 import { FaturaDetailDrawer } from "@/components/faturas/FaturaDetailDrawer";
 import { LoadingState, ErrorState } from "@/components/ui/states";
-import { useDocumentosFiltered, useCategorias, useTipos, useClienteNames } from "@/hooks/useSupabase";
+import { useDocumentosFiltered, useCategorias, useTipos } from "@/hooks/useSupabase";
 
 export default function Faturas() {
-  const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoria, setSelectedCategoria] = useState("all");
   const [selectedTipo, setSelectedTipo] = useState("all");
-  const [selectedCliente, setSelectedCliente] = useState("all");
   const [selectedFatura, setSelectedFatura] = useState<Documento | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-
-  // Read cliente filter from URL params
-  useEffect(() => {
-    const clienteFromUrl = searchParams.get("cliente");
-    if (clienteFromUrl) {
-      setSelectedCliente(clienteFromUrl);
-    }
-  }, [searchParams]);
 
   const { data: documentos, isLoading, error } = useDocumentosFiltered({
     search: searchQuery,
     categoria: selectedCategoria,
     tipo: selectedTipo,
-    cliente: selectedCliente,
   });
 
   const { data: categorias = [] } = useCategorias();
   const { data: tipos = [] } = useTipos();
-  const { data: clientes = [] } = useClienteNames();
 
   const handleViewDetails = (fatura: Documento) => {
     setSelectedFatura(fatura);
@@ -69,11 +56,8 @@ export default function Faturas() {
             onCategoriaChange={setSelectedCategoria}
             selectedTipo={selectedTipo}
             onTipoChange={setSelectedTipo}
-            selectedCliente={selectedCliente}
-            onClienteChange={setSelectedCliente}
             categorias={categorias}
             tipos={tipos}
-            clientes={clientes}
           />
         </div>
 

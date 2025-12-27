@@ -19,7 +19,7 @@ interface FaturasTableProps {
   onViewDetails: (fatura: Documento) => void;
 }
 
-type SortField = "data_doc" | "total" | "fornecedor_nome" | null;
+type SortField = "data_doc" | "total" | "fornecedor" | null;
 type SortDirection = "asc" | "desc";
 
 export function FaturasTable({ faturas, onViewDetails }: FaturasTableProps) {
@@ -33,10 +33,10 @@ export function FaturasTable({ faturas, onViewDetails }: FaturasTableProps) {
     }).format(value);
   };
 
-  // BANCOS = receita (verde), COMPRA = despesa (vermelho)
-  const getValueColor = (tipo: string) => {
+  // VENDA = receita (verde), COMPRA = despesa (vermelho)
+  const getValueColor = (tipo: string | null) => {
     if (tipo === "COMPRA") return "text-destructive";
-    if (tipo === "BANCOS") return "text-accent";
+    if (tipo === "VENDA") return "text-accent";
     return "text-card-foreground";
   };
 
@@ -59,8 +59,8 @@ export function FaturasTable({ faturas, onViewDetails }: FaturasTableProps) {
         comparison = new Date(a.data_doc).getTime() - new Date(b.data_doc).getTime();
       } else if (sortField === "total") {
         comparison = a.total - b.total;
-      } else if (sortField === "fornecedor_nome") {
-        comparison = a.fornecedor_nome.localeCompare(b.fornecedor_nome);
+      } else if (sortField === "fornecedor") {
+        comparison = a.fornecedor.localeCompare(b.fornecedor);
       }
       
       return sortDirection === "asc" ? comparison : -comparison;
@@ -104,11 +104,11 @@ export function FaturasTable({ faturas, onViewDetails }: FaturasTableProps) {
             </TableHead>
             <TableHead 
               className="text-muted-foreground font-semibold cursor-pointer hover:text-foreground transition-colors"
-              onClick={() => handleSort("fornecedor_nome")}
+              onClick={() => handleSort("fornecedor")}
             >
               <div className="flex items-center">
                 Fornecedor
-                <SortIcon field="fornecedor_nome" />
+                <SortIcon field="fornecedor" />
               </div>
             </TableHead>
             <TableHead className="text-muted-foreground font-semibold">Categoria</TableHead>
@@ -138,7 +138,7 @@ export function FaturasTable({ faturas, onViewDetails }: FaturasTableProps) {
                 {format(new Date(fatura.data_doc), "dd/MM/yyyy", { locale: pt })}
               </TableCell>
               <TableCell className="text-card-foreground font-medium">
-                {fatura.fornecedor_nome}
+                {fatura.fornecedor}
               </TableCell>
               <TableCell>
                 <Badge variant="secondary" className="font-normal">
@@ -150,7 +150,7 @@ export function FaturasTable({ faturas, onViewDetails }: FaturasTableProps) {
                   variant={fatura.tipo === "COMPRA" ? "destructive" : "default"}
                   className="font-normal"
                 >
-                  {fatura.tipo}
+                  {fatura.tipo || "—"}
                 </Badge>
               </TableCell>
               <TableCell className="max-w-[200px] truncate text-muted-foreground text-sm">
@@ -160,13 +160,13 @@ export function FaturasTable({ faturas, onViewDetails }: FaturasTableProps) {
                 {formatCurrency(fatura.total)}
               </TableCell>
               <TableCell className="text-right">
-                {fatura.drive_link && (
+                {fatura.link_drive && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.open(fatura.drive_link!, "_blank");
+                      window.open(fatura.link_drive!, "_blank");
                     }}
                     className="hover:bg-primary/10 hover:text-primary"
                   >

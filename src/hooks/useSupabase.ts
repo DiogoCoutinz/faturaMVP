@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
-import type { Documento, ClienteDerivado } from '@/types/database'
+import type { Documento } from '@/types/database'
 
 // Fetch all documentos
 export function useDocumentos() {
@@ -28,7 +28,6 @@ export function useDocumentosFiltered(filters: {
   search?: string
   categoria?: string
   tipo?: string
-  cliente?: string
 }) {
   return useQuery({
     queryKey: ['documentos', 'filtered', filters],
@@ -39,16 +38,13 @@ export function useDocumentosFiltered(filters: {
         .order('data_doc', { ascending: false })
 
       if (filters.search) {
-        query = query.ilike('fornecedor_nome', `%${filters.search}%`)
+        query = query.ilike('fornecedor', `%${filters.search}%`)
       }
       if (filters.categoria && filters.categoria !== 'all') {
         query = query.eq('categoria', filters.categoria)
       }
       if (filters.tipo && filters.tipo !== 'all') {
         query = query.eq('tipo', filters.tipo)
-      }
-      if (filters.cliente && filters.cliente !== 'all') {
-        query = query.eq('cliente_nome', filters.cliente)
       }
 
       const { data, error } = await query
@@ -107,11 +103,11 @@ export function useDashboardMetrics() {
       // Unique fornecedores
       const { data: fornecedoresData, error: fornError } = await supabase
         .from('documentos')
-        .select('fornecedor_nome')
+        .select('fornecedor')
 
       if (fornError) throw fornError
-      const fornecedores = (fornecedoresData || []) as { fornecedor_nome: string }[]
-      const uniqueFornecedores = new Set(fornecedores.map(d => d.fornecedor_nome)).size
+      const fornecedores = (fornecedoresData || []) as { fornecedor: string }[]
+      const uniqueFornecedores = new Set(fornecedores.map(d => d.fornecedor)).size
 
       // Latest invoice
       const { data: latestData, error: latestError } = await supabase
@@ -207,147 +203,9 @@ export function useTipos() {
 
       if (error) throw error
       
-      const docs = (data || []) as { tipo: string }[]
+      const docs = (data || []) as { tipo: string | null }[]
       const unique = [...new Set(docs.map(d => d.tipo).filter(Boolean))]
       return unique as string[]
-    },
-  })
-}
-
-// Fetch unique cliente names from documentos (for filter dropdown)
-export function useClienteNames() {
-  return useQuery({
-    queryKey: ['cliente_names'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('documentos')
-        .select('cliente_nome')
-
-      if (error) throw error
-      
-      const docs = (data || []) as { cliente_nome: string }[]
-      const unique = [...new Set(docs.map(d => d.cliente_nome).filter(Boolean))]
-      return unique.sort() as string[]
-    },
-  })
-}
-
-// Fetch derived clientes from documentos with stats
-export function useClientesDerivados(search?: string) {
-  return useQuery({
-    queryKey: ['clientes_derivados', search],
-    queryFn: async (): Promise<ClienteDerivado[]> => {
-      const { data, error } = await supabase
-        .from('documentos')
-        .select('cliente_nome, total')
-
-      if (error) {
-        console.error('Erro ao buscar clientes:', error.message, error.details, error.hint)
-        throw error
-      }
-
-      console.log('Dados para clientes:', data?.length || 0, 'documentos')
-
-      const docs = (data || []) as { cliente_nome: string; total: number }[]
-      
-      // Aggregate by cliente_nome
-      const clienteMap: Record<string, { totalDocumentos: number; totalGasto: number }> = {}
-      
-      docs.forEach((doc) => {
-        if (!doc.cliente_nome) return
-        if (!clienteMap[doc.cliente_nome]) {
-          clienteMap[doc.cliente_nome] = { totalDocumentos: 0, totalGasto: 0 }
-        }
-        clienteMap[doc.cliente_nome].totalDocumentos += 1
-        clienteMap[doc.cliente_nome].totalGasto += doc.total || 0
-      })
-
-      let clientes = Object.entries(clienteMap).map(([nome, stats]) => ({
-        nome,
-        totalDocumentos: stats.totalDocumentos,
-        totalGasto: Math.round(stats.totalGasto * 100) / 100,
-      }))
-
-      // Apply search filter
-      if (search) {
-        const searchLower = search.toLowerCase()
-        clientes = clientes.filter(c => c.nome.toLowerCase().includes(searchLower))
-      }
-
-      // Sort alphabetically
-      return clientes.sort((a, b) => a.nome.localeCompare(b.nome))
-    },
-  })
-}
-
-// Fetch documentos for a specific cliente
-export function useDocumentosByCliente(clienteNome: string) {
-  return useQuery({
-    queryKey: ['documentos', 'by_cliente', clienteNome],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('documentos')
-        .select('*')
-        .eq('cliente_nome', clienteNome)
-        .order('data_doc', { ascending: false })
-
-      if (error) throw error
-      return (data || []) as Documento[]
-    },
-    enabled: !!clienteNome,
-  })
-}
-
-// Fetch extratos with filters
-export function useExtratos(filters: {
-  search?: string
-  banco?: string
-  cliente?: string
-}) {
-  return useQuery({
-    queryKey: ['extratos', filters],
-    queryFn: async () => {
-      let query = supabase
-        .from('extratos_movimentos')
-        .select('*')
-        .order('data_movimento', { ascending: false })
-
-      if (filters.search) {
-        query = query.ilike('descritivo', `%${filters.search}%`)
-      }
-      if (filters.banco && filters.banco !== 'all') {
-        query = query.eq('banco_nome', filters.banco)
-      }
-      if (filters.cliente && filters.cliente !== 'all') {
-        query = query.eq('cliente_nome', filters.cliente)
-      }
-
-      const { data, error } = await query
-
-      if (error) {
-        console.error('Erro ao buscar extratos:', error.message)
-        throw error
-      }
-
-      return data || []
-    },
-  })
-}
-
-// Fetch unique bancos from extratos
-export function useBancos() {
-  return useQuery({
-    queryKey: ['bancos'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('extratos_movimentos')
-        .select('banco_nome')
-
-      if (error) throw error
-      
-      const docs = (data || []) as { banco_nome: string }[]
-      const unique = [...new Set(docs.map(d => d.banco_nome).filter(Boolean))]
-      return unique.sort() as string[]
     },
   })
 }
