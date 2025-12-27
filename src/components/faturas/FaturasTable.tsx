@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
-import { ExternalLink, FileText, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ExternalLink, FileText, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet } from "lucide-react";
 import type { Documento } from "@/types/database";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -160,19 +161,44 @@ export function FaturasTable({ faturas, onViewDetails }: FaturasTableProps) {
                 {formatCurrency(fatura.total)}
               </TableCell>
               <TableCell className="text-right">
-                {fatura.link_drive && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      window.open(fatura.link_drive!, "_blank");
-                    }}
-                    className="hover:bg-primary/10 hover:text-primary"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                )}
+                <div className="flex items-center justify-end gap-1">
+                  {fatura.sheet_link && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(fatura.sheet_link!, "_blank");
+                          }}
+                          className="hover:bg-accent/10 hover:text-accent"
+                        >
+                          <FileSpreadsheet className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Abrir Excel</TooltipContent>
+                    </Tooltip>
+                  )}
+                  {fatura.link_drive && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(fatura.link_drive!, "_blank");
+                          }}
+                          className="hover:bg-primary/10 hover:text-primary"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Abrir PDF</TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
               </TableCell>
             </TableRow>
           ))}
