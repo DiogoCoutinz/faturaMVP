@@ -1,21 +1,45 @@
 import { useState, useCallback } from "react";
-import { Upload, CheckCircle2, FileText, Mail, Loader2, AlertCircle, X } from "lucide-react";
+import { Upload, CheckCircle2, FileText, Loader2, AlertCircle, X, FileWarning, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
 const ACCEPTED_TYPES = ["application/pdf", "image/png", "image/jpeg"];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const WEBHOOK_URL = "https://n8n.diogocoutinho.cloud/webhook/faturapdf";
 
-type FileStatus = "pending" | "uploading" | "success" | "error";
+type ProcessingStep = 
+  | "pending"
+  | "uploading" 
+  | "reading"      // A ler a fatura
+  | "detected"     // Fatura detetada
+  | "invalid"      // Isto não parece uma fatura
+  | "checking"     // Verificar duplicada
+  | "duplicate"    // Fatura duplicada detetada
+  | "new"          // Nova fatura
+  | "saving"       // A guardar...
+  | "success"      // Concluído
+  | "error";
 
 interface UploadedFile {
   id: string;
   name: string;
-  status: FileStatus;
+  step: ProcessingStep;
   error?: string;
 }
+
+const STEP_CONFIG: Record<ProcessingStep, { label: string; color: string }> = {
+  pending: { label: "Na fila...", color: "text-muted-foreground" },
+  uploading: { label: "A enviar...", color: "text-primary" },
+  reading: { label: "A ler a fatura...", color: "text-primary" },
+  detected: { label: "Fatura detetada", color: "text-primary" },
+  invalid: { label: "Isto não parece uma fatura", color: "text-destructive" },
+  checking: { label: "A verificar duplicados...", color: "text-primary" },
+  duplicate: { label: "Fatura duplicada detetada", color: "text-warning" },
+  new: { label: "Nova fatura", color: "text-success" },
+  saving: { label: "A guardar no sistema...", color: "text-primary" },
+  success: { label: "Processado com sucesso", color: "text-success" },
+  error: { label: "Erro", color: "text-destructive" },
+};
 
 export function UploadZone() {
   const [isDragging, setIsDragging] = useState(false);
@@ -31,6 +55,28 @@ export function UploadZone() {
     return null;
   };
 
+  const updateFileStep = (fileId: string, step: ProcessingStep, error?: string) => {
+    setFiles(prev => prev.map(f => 
+      f.id === fileId ? { ...f, step, error } : f
+    ));
+  };
+
+  const simulateProcessing = async (fileId: string) => {
+    // Simula os passos do n8n enquanto o webhook processa
+    const steps: { step: ProcessingStep; delay: number }[] = [
+      { step: "reading", delay: 1500 },
+      { step: "detected", delay: 1000 },
+      { step: "checking", delay: 1500 },
+      { step: "new", delay: 800 },
+      { step: "saving", delay: 2000 },
+    ];
+
+    for (const { step, delay } of steps) {
+      updateFileStep(fileId, step);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  };
+
   const uploadFile = async (file: File, fileId: string) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -38,23 +84,30 @@ export function UploadZone() {
     formData.append("app", "FaturaAI");
 
     try {
-      setFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: "uploading" as FileStatus } : f));
+      updateFileStep(fileId, "uploading");
 
-      const response = await fetch(WEBHOOK_URL, {
+      // Inicia o upload e a simulação de estados em paralelo
+      const uploadPromise = fetch(WEBHOOK_URL, {
         method: "POST",
         body: formData,
       });
 
+      // Após envio bem sucedido, simula os passos do processamento
+      const response = await uploadPromise;
+      
       if (!response.ok) {
         throw new Error(`Erro ${response.status}`);
       }
 
-      setFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: "success" as FileStatus } : f));
-      toast({ title: "Sucesso", description: `${file.name} enviado para processamento.` });
+      // Simula os passos de processamento do n8n
+      await simulateProcessing(fileId);
+
+      updateFileStep(fileId, "success");
+      toast({ title: "Sucesso", description: `${file.name} processado e guardado.` });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Falha de rede";
-      setFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: "error" as FileStatus, error: errorMessage } : f));
-      toast({ title: "Erro", description: `Falha ao enviar ${file.name}: ${errorMessage}`, variant: "destructive" });
+      updateFileStep(fileId, "error", errorMessage);
+      toast({ title: "Erro", description: `Falha ao processar ${file.name}: ${errorMessage}`, variant: "destructive" });
     }
   };
 
@@ -66,11 +119,10 @@ export function UploadZone() {
       const validationError = validateFile(file);
 
       if (validationError) {
-        newFiles.push({ id: fileId, name: file.name, status: "error", error: validationError });
+        newFiles.push({ id: fileId, name: file.name, step: "error", error: validationError });
         toast({ title: "Ficheiro rejeitado", description: `${file.name}: ${validationError}`, variant: "destructive" });
       } else {
-        newFiles.push({ id: fileId, name: file.name, status: "pending" });
-        // Upload each valid file
+        newFiles.push({ id: fileId, name: file.name, step: "pending" });
         setTimeout(() => uploadFile(file, fileId), 0);
       }
     });
@@ -107,11 +159,21 @@ export function UploadZone() {
     setFiles(prev => prev.filter(f => f.id !== fileId));
   };
 
-  const getStatusIcon = (status: FileStatus) => {
-    switch (status) {
-      case "uploading":
+  const getStatusIcon = (step: ProcessingStep) => {
+    switch (step) {
       case "pending":
+      case "uploading":
+      case "reading":
+      case "checking":
+      case "saving":
         return <Loader2 className="h-4 w-4 text-primary animate-spin" />;
+      case "detected":
+      case "new":
+        return <FileText className="h-4 w-4 text-primary" />;
+      case "invalid":
+        return <FileWarning className="h-4 w-4 text-destructive" />;
+      case "duplicate":
+        return <Copy className="h-4 w-4 text-warning" />;
       case "success":
         return <CheckCircle2 className="h-4 w-4 text-success" />;
       case "error":
@@ -119,16 +181,15 @@ export function UploadZone() {
     }
   };
 
-  const getStatusText = (file: UploadedFile) => {
-    switch (file.status) {
-      case "pending":
-      case "uploading":
-        return "A enviar...";
-      case "success":
-        return "Enviado";
-      case "error":
-        return file.error || "Erro";
-    }
+  const getFileRowStyle = (step: ProcessingStep) => {
+    if (step === "error" || step === "invalid") return "border-destructive/50 bg-destructive/5";
+    if (step === "duplicate") return "border-warning/50 bg-warning/5";
+    if (step === "success") return "border-success/50 bg-success/5";
+    return "border-border bg-card";
+  };
+
+  const isProcessing = (step: ProcessingStep) => {
+    return ["pending", "uploading", "reading", "detected", "checking", "new", "saving"].includes(step);
   };
 
   return (
@@ -174,7 +235,7 @@ export function UploadZone() {
         </div>
       </div>
 
-      {/* File List */}
+      {/* File List with Processing States */}
       {files.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-sm font-medium text-card-foreground">Ficheiros</h4>
@@ -183,31 +244,36 @@ export function UploadZone() {
               <div
                 key={file.id}
                 className={cn(
-                  "flex items-center justify-between rounded-lg border px-4 py-3 transition-colors",
-                  file.status === "error" ? "border-destructive/50 bg-destructive/5" :
-                  file.status === "success" ? "border-success/50 bg-success/5" :
-                  "border-border bg-card"
+                  "flex items-center justify-between rounded-lg border px-4 py-3 transition-all duration-300",
+                  getFileRowStyle(file.step)
                 )}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  {getStatusIcon(file.status)}
-                  <span className="truncate text-sm text-card-foreground">{file.name}</span>
+                  {getStatusIcon(file.step)}
+                  <div className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-card-foreground">{file.name}</span>
+                    {isProcessing(file.step) && (
+                      <div className="mt-1 h-1 w-24 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full w-full bg-primary animate-pulse rounded-full" />
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className={cn(
-                    "text-xs",
-                    file.status === "error" ? "text-destructive" :
-                    file.status === "success" ? "text-success" :
-                    "text-muted-foreground"
+                    "text-xs font-medium whitespace-nowrap",
+                    STEP_CONFIG[file.step].color
                   )}>
-                    {getStatusText(file)}
+                    {file.error || STEP_CONFIG[file.step].label}
                   </span>
-                  <button
-                    onClick={() => removeFile(file.id)}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                  {!isProcessing(file.step) && (
+                    <button
+                      onClick={() => removeFile(file.id)}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -215,27 +281,11 @@ export function UploadZone() {
         </div>
       )}
 
-      {/* Email Import Card */}
-      <div className="rounded-xl border border-border bg-card p-6 shadow-card">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-            <Mail className="h-6 w-6 text-primary" />
-          </div>
-          <div className="flex-1">
-            <h4 className="font-semibold text-card-foreground">Importar do Email</h4>
-            <p className="text-sm text-muted-foreground">
-              Liga a tua conta de email para importar faturas automaticamente
-            </p>
-          </div>
-          <Button variant="outline">Ligar Email</Button>
-        </div>
-      </div>
-
       {/* Info Footer */}
       <div className="flex items-center gap-3 rounded-lg bg-muted/50 px-4 py-3">
         <FileText className="h-5 w-5 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">
-          As faturas serão processadas automaticamente e extraídos os dados relevantes.
+          As faturas serão processadas automaticamente e os dados extraídos serão guardados no sistema.
         </p>
       </div>
     </div>
