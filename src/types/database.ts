@@ -20,6 +20,7 @@ export interface Database {
           total: number
           categoria: string | null
           link_drive: string | null
+          sheet_link: string | null
           ano: number | null
           mes: string | null
           created_at: string | null
@@ -34,6 +35,7 @@ export interface Database {
           total: number
           categoria?: string | null
           link_drive?: string | null
+          sheet_link?: string | null
           ano?: number | null
           mes?: string | null
           created_at?: string | null
@@ -48,6 +50,7 @@ export interface Database {
           total?: number
           categoria?: string | null
           link_drive?: string | null
+          sheet_link?: string | null
           ano?: number | null
           mes?: string | null
           created_at?: string | null
