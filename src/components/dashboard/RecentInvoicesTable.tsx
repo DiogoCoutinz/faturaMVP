@@ -26,10 +26,10 @@ export function RecentInvoicesTable({ faturas, onViewDetails }: RecentInvoicesTa
     }).format(value);
   };
 
-  // BANCOS = receita (verde), COMPRA = despesa (vermelho)
-  const getValueColor = (tipo: string) => {
+  // VENDA = receita (verde), COMPRA = despesa (vermelho)
+  const getValueColor = (tipo: string | null) => {
     if (tipo === "COMPRA") return "text-destructive";
-    if (tipo === "BANCOS") return "text-accent";
+    if (tipo === "VENDA") return "text-accent";
     return "text-card-foreground";
   };
 
@@ -60,7 +60,7 @@ export function RecentInvoicesTable({ faturas, onViewDetails }: RecentInvoicesTa
               <TableCell className="font-medium text-card-foreground">
                 {format(new Date(fatura.data_doc), "dd MMM yyyy", { locale: pt })}
               </TableCell>
-              <TableCell className="text-card-foreground">{fatura.fornecedor_nome}</TableCell>
+              <TableCell className="text-card-foreground">{fatura.fornecedor}</TableCell>
               <TableCell>
                 <Badge variant="secondary" className="font-normal">
                   {fatura.categoria || "Sem categoria"}
@@ -70,13 +70,13 @@ export function RecentInvoicesTable({ faturas, onViewDetails }: RecentInvoicesTa
                 {formatCurrency(fatura.total)}
               </TableCell>
               <TableCell className="text-right">
-                {fatura.drive_link && (
+                {fatura.link_drive && (
                   <Button 
                     variant="ghost" 
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.open(fatura.drive_link!, "_blank");
+                      window.open(fatura.link_drive!, "_blank");
                     }}
                   >
                     <ExternalLink className="h-4 w-4" />

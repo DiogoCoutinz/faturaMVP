@@ -11,46 +11,46 @@ export interface Database {
     Tables: {
       documentos: {
         Row: {
-          id: string
-          cliente_nome: string
-          fornecedor_nome: string
-          fornecedor_nif: string | null
-          tipo: string
-          categoria: string | null
-          numero_doc: string | null
+          id: number
           data_doc: string
+          tipo: string | null
+          fornecedor: string
+          nif_fornecedor: string | null
+          numero_doc: string | null
           total: number
-          drive_link: string | null
-          sheet_link: string | null
-          created_at: string
+          categoria: string | null
+          link_drive: string | null
+          ano: number | null
+          mes: string | null
+          created_at: string | null
         }
         Insert: {
-          id?: string
-          cliente_nome: string
-          fornecedor_nome: string
-          fornecedor_nif?: string | null
-          tipo: string
-          categoria?: string | null
-          numero_doc?: string | null
+          id?: never
           data_doc: string
+          tipo?: string | null
+          fornecedor: string
+          nif_fornecedor?: string | null
+          numero_doc?: string | null
           total: number
-          drive_link?: string | null
-          sheet_link?: string | null
-          created_at?: string
+          categoria?: string | null
+          link_drive?: string | null
+          ano?: number | null
+          mes?: string | null
+          created_at?: string | null
         }
         Update: {
-          id?: string
-          cliente_nome?: string
-          fornecedor_nome?: string
-          fornecedor_nif?: string | null
-          tipo?: string
-          categoria?: string | null
-          numero_doc?: string | null
+          id?: never
           data_doc?: string
+          tipo?: string | null
+          fornecedor?: string
+          nif_fornecedor?: string | null
+          numero_doc?: string | null
           total?: number
-          drive_link?: string | null
-          sheet_link?: string | null
-          created_at?: string
+          categoria?: string | null
+          link_drive?: string | null
+          ano?: number | null
+          mes?: string | null
+          created_at?: string | null
         }
       }
     }
@@ -59,9 +59,14 @@ export interface Database {
 
 export type Documento = Database['public']['Tables']['documentos']['Row']
 
-// Derived type for clients (extracted from documentos)
-export interface ClienteDerivado {
-  nome: string
-  totalDocumentos: number
-  totalGasto: number
+// Helper to get year from data_doc
+export function getAnoFromDate(dataDoc: string): number {
+  return new Date(dataDoc).getFullYear()
+}
+
+// Helper to get month from data_doc
+export function getMesFromDate(dataDoc: string): string {
+  const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+  return months[new Date(dataDoc).getMonth()]
 }

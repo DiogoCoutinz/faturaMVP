@@ -10,115 +10,52 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
-      clientes: {
-        Row: {
-          created_at: string | null
-          id: string
-          nome: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          nome: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          nome?: string
-        }
-        Relationships: []
-      }
       documentos: {
         Row: {
+          ano: number | null
           categoria: string | null
-          cliente_nome: string
           created_at: string | null
           data_doc: string
-          drive_link: string | null
-          fornecedor_nif: string | null
-          fornecedor_nome: string
-          id: string
+          fornecedor: string
+          id: number
+          link_drive: string | null
+          mes: string | null
+          nif_fornecedor: string | null
           numero_doc: string | null
-          sheet_link: string | null
-          tipo: string
+          tipo: string | null
           total: number
         }
         Insert: {
+          ano?: number | null
           categoria?: string | null
-          cliente_nome: string
           created_at?: string | null
           data_doc: string
-          drive_link?: string | null
-          fornecedor_nif?: string | null
-          fornecedor_nome: string
-          id?: string
+          fornecedor: string
+          id?: never
+          link_drive?: string | null
+          mes?: string | null
+          nif_fornecedor?: string | null
           numero_doc?: string | null
-          sheet_link?: string | null
-          tipo: string
+          tipo?: string | null
           total: number
         }
         Update: {
+          ano?: number | null
           categoria?: string | null
-          cliente_nome?: string
           created_at?: string | null
           data_doc?: string
-          drive_link?: string | null
-          fornecedor_nif?: string | null
-          fornecedor_nome?: string
-          id?: string
+          fornecedor?: string
+          id?: never
+          link_drive?: string | null
+          mes?: string | null
+          nif_fornecedor?: string | null
           numero_doc?: string | null
-          sheet_link?: string | null
-          tipo?: string
+          tipo?: string | null
           total?: number
-        }
-        Relationships: []
-      }
-      extratos_movimentos: {
-        Row: {
-          ano: number
-          banco_nome: string
-          cliente_nome: string
-          created_at: string | null
-          credito: number | null
-          data_movimento: string
-          debito: number | null
-          descritivo: string
-          id: string
-          mes_nome: string
-          mes_numero: string
-          saldo_apos_movimento: number
-        }
-        Insert: {
-          ano: number
-          banco_nome: string
-          cliente_nome: string
-          created_at?: string | null
-          credito?: number | null
-          data_movimento: string
-          debito?: number | null
-          descritivo: string
-          id?: string
-          mes_nome: string
-          mes_numero: string
-          saldo_apos_movimento: number
-        }
-        Update: {
-          ano?: number
-          banco_nome?: string
-          cliente_nome?: string
-          created_at?: string | null
-          credito?: number | null
-          data_movimento?: string
-          debito?: number | null
-          descritivo?: string
-          id?: string
-          mes_nome?: string
-          mes_numero?: string
-          saldo_apos_movimento?: number
         }
         Relationships: []
       }

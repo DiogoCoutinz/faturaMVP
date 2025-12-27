@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
-import { X, ExternalLink, FileSpreadsheet, Building2, Calendar, Hash, Tag } from "lucide-react";
+import { X, ExternalLink, Building2, Calendar, Hash, Tag } from "lucide-react";
 import type { Documento } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +47,7 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
           <div className="flex items-start justify-between">
             <div>
               <SheetTitle className="text-xl font-bold text-foreground">
-                {fatura.fornecedor_nome}
+                {fatura.fornecedor}
               </SheetTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 Detalhes da fatura
@@ -58,9 +58,11 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
             </Button>
           </div>
           <div className="flex gap-2">
-            <Badge variant={fatura.tipo === "COMPRA" ? "default" : "secondary"}>
-              {fatura.tipo}
-            </Badge>
+            {fatura.tipo && (
+              <Badge variant={fatura.tipo === "COMPRA" ? "default" : "secondary"}>
+                {fatura.tipo}
+              </Badge>
+            )}
             {fatura.categoria && (
               <Badge variant="outline">{fatura.categoria}</Badge>
             )}
@@ -71,13 +73,13 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
           <DetailRow
             icon={Building2}
             label="Fornecedor"
-            value={fatura.fornecedor_nome}
+            value={fatura.fornecedor}
           />
-          {fatura.fornecedor_nif && (
+          {fatura.nif_fornecedor && (
             <DetailRow
               icon={Hash}
               label="NIF"
-              value={fatura.fornecedor_nif}
+              value={fatura.nif_fornecedor}
             />
           )}
           <DetailRow
@@ -112,32 +114,24 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
           <Separator className="my-4" />
 
           <div className="space-y-3 pt-2">
-            {fatura.drive_link && (
+            {fatura.link_drive && (
               <Button 
                 className="w-full gap-2" 
-                onClick={() => window.open(fatura.drive_link!, "_blank")}
+                onClick={() => window.open(fatura.link_drive!, "_blank")}
               >
                 <ExternalLink className="h-4 w-4" />
                 Abrir PDF
               </Button>
             )}
-            {fatura.sheet_link && (
-              <Button 
-                variant="outline" 
-                className="w-full gap-2"
-                onClick={() => window.open(fatura.sheet_link!, "_blank")}
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                Abrir no Google Sheets
-              </Button>
-            )}
           </div>
 
-          <div className="mt-6 rounded-lg bg-muted/50 p-4">
-            <p className="text-xs text-muted-foreground">
-              Adicionado em {format(new Date(fatura.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
-            </p>
-          </div>
+          {fatura.created_at && (
+            <div className="mt-6 rounded-lg bg-muted/50 p-4">
+              <p className="text-xs text-muted-foreground">
+                Adicionado em {format(new Date(fatura.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: pt })}
+              </p>
+            </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>

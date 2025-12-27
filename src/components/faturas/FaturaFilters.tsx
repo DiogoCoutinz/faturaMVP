@@ -15,11 +15,8 @@ interface FaturaFiltersProps {
   onCategoriaChange: (value: string) => void;
   selectedTipo: string;
   onTipoChange: (value: string) => void;
-  selectedCliente: string;
-  onClienteChange: (value: string) => void;
   categorias: string[];
   tipos: string[];
-  clientes: string[];
 }
 
 export function FaturaFilters({
@@ -29,11 +26,8 @@ export function FaturaFilters({
   onCategoriaChange,
   selectedTipo,
   onTipoChange,
-  selectedCliente,
-  onClienteChange,
   categorias,
   tipos,
-  clientes,
 }: FaturaFiltersProps) {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
@@ -47,20 +41,6 @@ export function FaturaFilters({
         />
       </div>
       <div className="flex flex-wrap gap-3">
-        <Select value={selectedCliente} onValueChange={onClienteChange}>
-          <SelectTrigger className="w-[160px] bg-card border-border">
-            <SelectValue placeholder="Cliente" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os clientes</SelectItem>
-            {clientes.map((cliente) => (
-              <SelectItem key={cliente} value={cliente}>
-                {cliente}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
         <Select value={selectedCategoria} onValueChange={onCategoriaChange}>
           <SelectTrigger className="w-[180px] bg-card border-border">
             <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
