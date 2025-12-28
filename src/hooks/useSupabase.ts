@@ -48,18 +48,23 @@ export function useDocumentosFiltered(filters: {
       if (filters.tipo && filters.tipo !== 'all') {
         query = query.eq('tipo', filters.tipo)
       }
-      // Filtrar por ano usando a data_doc (formato: YYYY-MM-DD)
-      if (filters.ano && filters.ano !== 'all') {
-        const startOfYear = `${filters.ano}-01-01`
-        const endOfYear = `${filters.ano}-12-31`
-        query = query.gte('data_doc', startOfYear).lte('data_doc', endOfYear)
-      }
-      // Filtrar por mês usando a data_doc
-      if (filters.mes && filters.mes !== 'all' && filters.ano) {
+      // Filtrar por ano e/ou mês usando a data_doc
+      if (filters.ano && filters.ano !== 'all' && filters.mes && filters.mes !== 'all') {
+        // Ambos ano e mês selecionados
         const mesNum = filters.mes.padStart(2, '0')
         const startOfMonth = `${filters.ano}-${mesNum}-01`
         const endOfMonth = `${filters.ano}-${mesNum}-31`
         query = query.gte('data_doc', startOfMonth).lte('data_doc', endOfMonth)
+      } else if (filters.ano && filters.ano !== 'all') {
+        // Só ano selecionado
+        const startOfYear = `${filters.ano}-01-01`
+        const endOfYear = `${filters.ano}-12-31`
+        query = query.gte('data_doc', startOfYear).lte('data_doc', endOfYear)
+      } else if (filters.mes && filters.mes !== 'all') {
+        // Só mês selecionado - filtra por esse mês em qualquer ano
+        const mesNum = filters.mes.padStart(2, '0')
+        // Usar filtro no formato MM para qualquer ano
+        query = query.like('data_doc', `%-${mesNum}-%`)
       }
 
       const { data, error } = await query

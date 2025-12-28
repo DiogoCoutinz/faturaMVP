@@ -81,7 +81,7 @@ export function FaturaFilters({
           </SelectContent>
         </Select>
 
-        <Select value={selectedMes} onValueChange={onMesChange} disabled={selectedAno === "all"}>
+        <Select value={selectedMes} onValueChange={onMesChange}>
           <SelectTrigger className="w-[140px] bg-card border-border">
             <SelectValue placeholder="Mês" />
           </SelectTrigger>
