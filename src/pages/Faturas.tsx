@@ -5,7 +5,7 @@ import { FaturaFilters } from "@/components/faturas/FaturaFilters";
 import { FaturasTable } from "@/components/faturas/FaturasTable";
 import { FaturaDetailDrawer } from "@/components/faturas/FaturaDetailDrawer";
 import { LoadingState, ErrorState } from "@/components/ui/states";
-import { useDocumentosFiltered, useCategorias, useTipos } from "@/hooks/useSupabase";
+import { useDocumentosFiltered, useCategorias, useTipos, useAnos } from "@/hooks/useSupabase";
 import { useSearchParams } from "react-router-dom";
 
 const MESES = [
@@ -16,12 +16,12 @@ const MESES = [
 export default function Faturas() {
   const [searchParams] = useSearchParams();
   const fornecedorFromUrl = searchParams.get("fornecedor");
-  const anoFromUrl = searchParams.get("ano");
-  const mesFromUrl = searchParams.get("mes");
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoria, setSelectedCategoria] = useState("all");
   const [selectedTipo, setSelectedTipo] = useState("all");
+  const [selectedAno, setSelectedAno] = useState("all");
+  const [selectedMes, setSelectedMes] = useState("all");
   const [selectedFatura, setSelectedFatura] = useState<Documento | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -29,12 +29,13 @@ export default function Faturas() {
     search: fornecedorFromUrl || searchQuery,
     categoria: selectedCategoria,
     tipo: selectedTipo,
-    ano: anoFromUrl || undefined,
-    mes: mesFromUrl || undefined,
+    ano: selectedAno !== "all" ? selectedAno : undefined,
+    mes: selectedMes !== "all" ? selectedMes : undefined,
   });
 
   const { data: categorias = [] } = useCategorias();
   const { data: tipos = [] } = useTipos();
+  const { data: anos = [] } = useAnos();
 
   const handleViewDetails = (fatura: Documento) => {
     setSelectedFatura(fatura);
@@ -57,27 +58,19 @@ export default function Faturas() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
             {fornecedorFromUrl 
               ? fornecedorFromUrl 
-              : anoFromUrl 
-                ? mesFromUrl 
-                  ? `${MESES[parseInt(mesFromUrl) - 1]} ${anoFromUrl}`
-                  : `Ano ${anoFromUrl}`
-                : "Faturas"
+              : "Faturas"
             }
           </h1>
           <p className="mt-1 text-muted-foreground">
             {fornecedorFromUrl 
               ? `Faturas de ${fornecedorFromUrl}`
-              : anoFromUrl
-                ? mesFromUrl
-                  ? `Faturas de ${MESES[parseInt(mesFromUrl) - 1]} de ${anoFromUrl}`
-                  : `Todas as faturas de ${anoFromUrl}`
-                : "Consulte e gerencie todas as suas faturas"
+              : "Consulte e gerencie todas as suas faturas"
             }
           </p>
         </div>
 
         {/* Filters */}
-        {!fornecedorFromUrl && !anoFromUrl && (
+        {!fornecedorFromUrl && (
           <div className="animate-fade-in" style={{ animationDelay: "50ms" }}>
             <FaturaFilters
               searchQuery={searchQuery}
@@ -86,8 +79,16 @@ export default function Faturas() {
               onCategoriaChange={setSelectedCategoria}
               selectedTipo={selectedTipo}
               onTipoChange={setSelectedTipo}
+              selectedAno={selectedAno}
+              onAnoChange={(value) => {
+                setSelectedAno(value);
+                if (value === "all") setSelectedMes("all");
+              }}
+              selectedMes={selectedMes}
+              onMesChange={setSelectedMes}
               categorias={categorias}
               tipos={tipos}
+              anos={anos}
             />
           </div>
         )}

@@ -232,3 +232,22 @@ export function useTipos() {
     },
   })
 }
+
+// Fetch unique years from documentos
+export function useAnos() {
+  return useQuery({
+    queryKey: ['anos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('documentos')
+        .select('data_doc')
+
+      if (error) throw error
+      
+      const docs = (data || []) as { data_doc: string }[]
+      const years = docs.map(d => new Date(d.data_doc).getFullYear())
+      const unique = [...new Set(years)].sort((a, b) => b - a)
+      return unique
+    },
+  })
+}
