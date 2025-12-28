@@ -1,6 +1,20 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import type { Documento } from '@/types/database'
+
+type DocumentoUpdate = {
+  fornecedor?: string
+  nif_fornecedor?: string | null
+  numero_doc?: string | null
+  total?: number
+  categoria?: string | null
+  tipo?: string | null
+  data_doc?: string
+  link_drive?: string | null
+  sheet_link?: string | null
+  ano?: number | null
+  mes?: string | null
+}
 
 // Fetch all documentos
 export function useDocumentos() {
@@ -264,6 +278,55 @@ export function useAnos() {
       const years = docs.map(d => new Date(d.data_doc).getFullYear())
       const unique = [...new Set(years)].sort((a, b) => b - a)
       return unique
+    },
+  })
+}
+
+// Update documento
+export function useUpdateDocumento() {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: number; updates: DocumentoUpdate }) => {
+      const { data, error } = await (supabase
+        .from('documentos') as any)
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Erro ao atualizar documento:', error.message)
+        throw error
+      }
+      return data as Documento
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documentos'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+// Delete documento
+export function useDeleteDocumento() {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const { error } = await supabase
+        .from('documentos')
+        .delete()
+        .eq('id', id)
+
+      if (error) {
+        console.error('Erro ao eliminar documento:', error.message)
+        throw error
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documentos'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
