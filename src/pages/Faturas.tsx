@@ -8,9 +8,16 @@ import { LoadingState, ErrorState } from "@/components/ui/states";
 import { useDocumentosFiltered, useCategorias, useTipos } from "@/hooks/useSupabase";
 import { useSearchParams } from "react-router-dom";
 
+const MESES = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+];
+
 export default function Faturas() {
   const [searchParams] = useSearchParams();
   const fornecedorFromUrl = searchParams.get("fornecedor");
+  const anoFromUrl = searchParams.get("ano");
+  const mesFromUrl = searchParams.get("mes");
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoria, setSelectedCategoria] = useState("all");
@@ -22,6 +29,8 @@ export default function Faturas() {
     search: fornecedorFromUrl || searchQuery,
     categoria: selectedCategoria,
     tipo: selectedTipo,
+    ano: anoFromUrl || undefined,
+    mes: mesFromUrl || undefined,
   });
 
   const { data: categorias = [] } = useCategorias();
@@ -46,18 +55,29 @@ export default function Faturas() {
         {/* Header */}
         <div className="animate-fade-in">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            {fornecedorFromUrl ? fornecedorFromUrl : "Faturas"}
+            {fornecedorFromUrl 
+              ? fornecedorFromUrl 
+              : anoFromUrl 
+                ? mesFromUrl 
+                  ? `${MESES[parseInt(mesFromUrl) - 1]} ${anoFromUrl}`
+                  : `Ano ${anoFromUrl}`
+                : "Faturas"
+            }
           </h1>
           <p className="mt-1 text-muted-foreground">
             {fornecedorFromUrl 
               ? `Faturas de ${fornecedorFromUrl}`
-              : "Consulte e gerencie todas as suas faturas"
+              : anoFromUrl
+                ? mesFromUrl
+                  ? `Faturas de ${MESES[parseInt(mesFromUrl) - 1]} de ${anoFromUrl}`
+                  : `Todas as faturas de ${anoFromUrl}`
+                : "Consulte e gerencie todas as suas faturas"
             }
           </p>
         </div>
 
         {/* Filters */}
-        {!fornecedorFromUrl && (
+        {!fornecedorFromUrl && !anoFromUrl && (
           <div className="animate-fade-in" style={{ animationDelay: "50ms" }}>
             <FaturaFilters
               searchQuery={searchQuery}
