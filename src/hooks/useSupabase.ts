@@ -28,6 +28,8 @@ export function useDocumentosFiltered(filters: {
   search?: string
   categoria?: string
   tipo?: string
+  ano?: string
+  mes?: string
 }) {
   return useQuery({
     queryKey: ['documentos', 'filtered', filters],
@@ -46,6 +48,14 @@ export function useDocumentosFiltered(filters: {
       if (filters.tipo && filters.tipo !== 'all') {
         query = query.eq('tipo', filters.tipo)
       }
+      if (filters.ano && filters.ano !== 'all') {
+        query = query.eq('ano', parseInt(filters.ano))
+      }
+      if (filters.mes && filters.mes !== 'all' && filters.ano) {
+        // Filtrar por mês usando o campo mes ou extraindo da data
+        const mesNome = getMesNome(parseInt(filters.mes))
+        query = query.eq('mes', mesNome)
+      }
 
       const { data, error } = await query
 
@@ -57,6 +67,14 @@ export function useDocumentosFiltered(filters: {
       return (data || []) as Documento[]
     },
   })
+}
+
+function getMesNome(mes: number): string {
+  const meses = [
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+  ]
+  return meses[mes - 1] || ""
 }
 
 
