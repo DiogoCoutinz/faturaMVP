@@ -48,13 +48,18 @@ export function useDocumentosFiltered(filters: {
       if (filters.tipo && filters.tipo !== 'all') {
         query = query.eq('tipo', filters.tipo)
       }
+      // Filtrar por ano usando a data_doc (formato: YYYY-MM-DD)
       if (filters.ano && filters.ano !== 'all') {
-        query = query.eq('ano', parseInt(filters.ano))
+        const startOfYear = `${filters.ano}-01-01`
+        const endOfYear = `${filters.ano}-12-31`
+        query = query.gte('data_doc', startOfYear).lte('data_doc', endOfYear)
       }
+      // Filtrar por mês usando a data_doc
       if (filters.mes && filters.mes !== 'all' && filters.ano) {
-        // Filtrar por mês usando o campo mes ou extraindo da data
-        const mesNome = getMesNome(parseInt(filters.mes))
-        query = query.eq('mes', mesNome)
+        const mesNum = filters.mes.padStart(2, '0')
+        const startOfMonth = `${filters.ano}-${mesNum}-01`
+        const endOfMonth = `${filters.ano}-${mesNum}-31`
+        query = query.gte('data_doc', startOfMonth).lte('data_doc', endOfMonth)
       }
 
       const { data, error } = await query
