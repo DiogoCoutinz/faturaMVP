@@ -48,23 +48,26 @@ export function useDocumentosFiltered(filters: {
       if (filters.tipo && filters.tipo !== 'all') {
         query = query.eq('tipo', filters.tipo)
       }
-      // Filtrar por ano e/ou mês usando a data_doc
-      if (filters.ano && filters.ano !== 'all' && filters.mes && filters.mes !== 'all') {
-        // Ambos ano e mês selecionados
-        const mesNum = filters.mes.padStart(2, '0')
-        const startOfMonth = `${filters.ano}-${mesNum}-01`
-        const endOfMonth = `${filters.ano}-${mesNum}-31`
-        query = query.gte('data_doc', startOfMonth).lte('data_doc', endOfMonth)
-      } else if (filters.ano && filters.ano !== 'all') {
-        // Só ano selecionado
-        const startOfYear = `${filters.ano}-01-01`
-        const endOfYear = `${filters.ano}-12-31`
-        query = query.gte('data_doc', startOfYear).lte('data_doc', endOfYear)
-      } else if (filters.mes && filters.mes !== 'all') {
-        // Só mês selecionado - filtra por esse mês em qualquer ano
-        const mesNum = filters.mes.padStart(2, '0')
-        // Usar filtro no formato MM para qualquer ano
-        query = query.like('data_doc', `%-${mesNum}-%`)
+      const hasAno = !!(filters.ano && filters.ano !== 'all')
+      const hasMes = !!(filters.mes && filters.mes !== 'all')
+
+      // Filtrar por ano e/ou mês usando a data_doc (tipo DATE)
+      if (hasAno && hasMes) {
+        const ano = parseInt(filters.ano as string, 10)
+        const mes = parseInt(filters.mes as string, 10)
+        const mesNum = String(mes).padStart(2, '0')
+
+        const startOfMonth = `${ano}-${mesNum}-01`
+        const nextAno = mes === 12 ? ano + 1 : ano
+        const nextMes = mes === 12 ? 1 : mes + 1
+        const endExclusive = `${nextAno}-${String(nextMes).padStart(2, '0')}-01`
+
+        query = query.gte('data_doc', startOfMonth).lt('data_doc', endExclusive)
+      } else if (hasAno) {
+        const ano = parseInt(filters.ano as string, 10)
+        const startOfYear = `${ano}-01-01`
+        const endExclusive = `${ano + 1}-01-01`
+        query = query.gte('data_doc', startOfYear).lt('data_doc', endExclusive)
       }
 
       const { data, error } = await query
@@ -74,7 +77,15 @@ export function useDocumentosFiltered(filters: {
         throw error
       }
 
-      return (data || []) as Documento[]
+      let result = (data || []) as Documento[]
+
+      // Só mês selecionado (sem ano): filtra no cliente para evitar operadores inválidos em DATE
+      if (!hasAno && hasMes) {
+        const mes = parseInt(filters.mes as string, 10)
+        result = result.filter((d) => parseInt(d.data_doc.slice(5, 7), 10) === mes)
+      }
+
+      return result
     },
   })
 }

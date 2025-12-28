@@ -82,7 +82,6 @@ export default function Faturas() {
               selectedAno={selectedAno}
               onAnoChange={(value) => {
                 setSelectedAno(value);
-                if (value === "all") setSelectedMes("all");
               }}
               selectedMes={selectedMes}
               onMesChange={setSelectedMes}
