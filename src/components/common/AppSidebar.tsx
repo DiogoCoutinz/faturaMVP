@@ -9,7 +9,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useDocumentos } from "@/hooks/useSupabase";
+import { useDocumentos } from "@/features/faturas/hooks/useFaturas";
 import { useMemo, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -41,7 +41,7 @@ export function AppSidebar() {
     const stats: Record<string, FornecedorStats> = {};
 
     documentos.forEach((doc) => {
-      const nome = doc.fornecedor;
+      const nome = doc.supplier_name || 'Desconhecido';
       if (!stats[nome]) {
         stats[nome] = { nome, count: 0 };
       }

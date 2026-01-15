@@ -2,13 +2,13 @@ import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { useState } from "react";
 import { X, ExternalLink, Building2, Calendar, Hash, Tag, Pencil, Trash2, Save, XCircle } from "lucide-react";
-import type { Documento } from "@/types/database";
+import type { Invoice } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useUpdateDocumento, useDeleteDocumento } from "@/hooks/useSupabase";
+import { useUpdateDocumento, useDeleteDocumento } from "@/features/faturas/hooks/useFaturas";
 import { toast } from "@/hooks/use-toast";
 import {
   Sheet,
@@ -29,14 +29,14 @@ import {
 } from "@/components/ui/alert-dialog";
 
 interface FaturaDetailDrawerProps {
-  fatura: Documento | null;
+  fatura: Invoice | null;
   open: boolean;
   onClose: () => void;
 }
 
 export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawerProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editData, setEditData] = useState<Partial<Documento>>({});
+  const [editData, setEditData] = useState<Partial<Invoice>>({});
   
   const updateMutation = useUpdateDocumento();
   const deleteMutation = useDeleteDocumento();
@@ -52,13 +52,13 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
 
   const handleStartEdit = () => {
     setEditData({
-      fornecedor: fatura.fornecedor,
-      nif_fornecedor: fatura.nif_fornecedor || "",
-      numero_doc: fatura.numero_doc || "",
-      total: fatura.total,
-      categoria: fatura.categoria || "",
-      tipo: fatura.tipo || "",
-      data_doc: fatura.data_doc,
+      supplier_name: fatura.supplier_name,
+      supplier_vat: fatura.supplier_vat || "",
+      doc_number: fatura.doc_number || "",
+      total_amount: fatura.total_amount,
+      cost_type: fatura.cost_type || "",
+      document_type: fatura.document_type || "",
+      doc_date: fatura.doc_date,
     });
     setIsEditing(true);
   };
@@ -118,11 +118,11 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
     </div>
   );
 
-  const EditField = ({ label, field, type = "text" }: { label: string; field: keyof Documento; type?: string }) => (
+  const EditField = ({ label, field, type = "text" }: { label: string; field: keyof Invoice; type?: string }) => (
     <div className="space-y-2">
-      <Label htmlFor={field}>{label}</Label>
+      <Label htmlFor={field as string}>{label}</Label>
       <Input
-        id={field}
+        id={field as string}
         type={type}
         value={editData[field] as string || ""}
         onChange={(e) => setEditData(prev => ({ 
@@ -145,7 +145,7 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
           <div className="flex items-start justify-between">
             <div>
               <SheetTitle className="text-xl font-bold text-foreground">
-                {fatura.fornecedor}
+                {fatura.supplier_name}
               </SheetTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 {isEditing ? "Editar fatura" : "Detalhes da fatura"}
@@ -160,13 +160,13 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
           </div>
           {!isEditing && (
             <div className="flex gap-2">
-              {fatura.tipo && (
-                <Badge variant={fatura.tipo === "COMPRA" ? "default" : "secondary"}>
-                  {fatura.tipo}
+              {fatura.document_type && (
+                <Badge variant={fatura.document_type === "COMPRA" ? "default" : "secondary"}>
+                  {fatura.document_type}
                 </Badge>
               )}
-              {fatura.categoria && (
-                <Badge variant="outline">{fatura.categoria}</Badge>
+              {fatura.cost_type && (
+                <Badge variant="outline">{fatura.cost_type}</Badge>
               )}
             </div>
           )}
@@ -174,13 +174,13 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
 
         {isEditing ? (
           <div className="mt-6 space-y-4">
-            <EditField label="Fornecedor" field="fornecedor" />
-            <EditField label="NIF Fornecedor" field="nif_fornecedor" />
-            <EditField label="Número Documento" field="numero_doc" />
-            <EditField label="Total (€)" field="total" type="number" />
-            <EditField label="Categoria" field="categoria" />
-            <EditField label="Tipo" field="tipo" />
-            <EditField label="Data" field="data_doc" type="date" />
+            <EditField label="Fornecedor" field="supplier_name" />
+            <EditField label="NIF Fornecedor" field="supplier_vat" />
+            <EditField label="Número Documento" field="doc_number" />
+            <EditField label="Total (€)" field="total_amount" type="number" />
+            <EditField label="Categoria" field="cost_type" />
+            <EditField label="Tipo" field="document_type" />
+            <EditField label="Data" field="doc_date" type="date" />
 
             <Separator className="my-4" />
 
@@ -208,32 +208,32 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
             <DetailRow
               icon={Building2}
               label="Fornecedor"
-              value={fatura.fornecedor}
+              value={fatura.supplier_name || ""}
             />
-            {fatura.nif_fornecedor && (
+            {fatura.supplier_vat && (
               <DetailRow
                 icon={Hash}
                 label="NIF"
-                value={fatura.nif_fornecedor}
+                value={fatura.supplier_vat}
               />
             )}
             <DetailRow
               icon={Calendar}
               label="Data do Documento"
-              value={format(new Date(fatura.data_doc), "dd 'de' MMMM 'de' yyyy", { locale: pt })}
+              value={fatura.doc_date ? format(new Date(fatura.doc_date), "dd 'de' MMMM 'de' yyyy", { locale: pt }) : "—"}
             />
-            {fatura.numero_doc && (
+            {fatura.doc_number && (
               <DetailRow
                 icon={Hash}
                 label="Número do Documento"
-                value={fatura.numero_doc}
+                value={fatura.doc_number}
               />
             )}
-            {fatura.categoria && (
+            {fatura.cost_type && (
               <DetailRow
                 icon={Tag}
                 label="Categoria"
-                value={fatura.categoria}
+                value={fatura.cost_type}
               />
             )}
 
@@ -242,17 +242,17 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
             <div className="flex items-center justify-between py-4">
               <span className="text-lg font-medium text-muted-foreground">Total</span>
               <span className="text-2xl font-bold text-foreground">
-                {formatCurrency(fatura.total)}
+                {formatCurrency(Number(fatura.total_amount) || 0)}
               </span>
             </div>
 
             <Separator className="my-4" />
 
             <div className="space-y-3 pt-2">
-              {fatura.link_drive && (
+              {fatura.drive_link && (
                 <Button 
                   className="w-full gap-2" 
-                  onClick={() => window.open(fatura.link_drive!, "_blank")}
+                  onClick={() => window.open(fatura.drive_link!, "_blank")}
                 >
                   <ExternalLink className="h-4 w-4" />
                   Abrir PDF
@@ -280,8 +280,8 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
                     <AlertDialogHeader>
                       <AlertDialogTitle>Eliminar fatura?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Esta ação não pode ser revertida. A fatura de "{fatura.fornecedor}" 
-                        no valor de {formatCurrency(fatura.total)} será permanentemente eliminada.
+                        Esta ação não pode ser revertida. A fatura de "{fatura.supplier_name}" 
+                        no valor de {formatCurrency(Number(fatura.total_amount) || 0)} será permanentemente eliminada.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

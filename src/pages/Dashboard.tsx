@@ -2,17 +2,17 @@ import { useState } from "react";
 import { FileText, Euro, Building2, TrendingUp, TrendingDown, Wallet } from "lucide-react";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { MetricCard } from "@/components/dashboard/MetricCard";
-import { RecentInvoicesTable } from "@/components/dashboard/RecentInvoicesTable";
-import { CategoryChart } from "@/components/dashboard/CategoryChart";
-import { FaturaDetailDrawer } from "@/components/faturas/FaturaDetailDrawer";
+import { AppLayout } from "@/components/common/AppLayout";
+import { MetricCard } from "@/features/dashboard/MetricCard";
+import { RecentInvoicesTable } from "@/features/dashboard/RecentInvoicesTable";
+import { CategoryChart } from "@/features/dashboard/CategoryChart";
+import { FaturaDetailDrawer } from "@/features/faturas/FaturaDetailDrawer";
 import { LoadingState, ErrorState, EmptyState } from "@/components/ui/states";
-import { useDashboardMetrics, useRecentDocumentos, useCategoryBreakdown } from "@/hooks/useSupabase";
-import type { Documento } from "@/types/database";
+import { useDashboardMetrics, useRecentDocumentos, useCategoryBreakdown } from "@/features/faturas/hooks/useFaturas";
+import type { Invoice } from "@/types/database";
 
 export default function Dashboard() {
-  const [selectedFatura, setSelectedFatura] = useState<Documento | null>(null);
+  const [selectedFatura, setSelectedFatura] = useState<Invoice | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const { data: metrics, isLoading: metricsLoading, error: metricsError } = useDashboardMetrics();
@@ -26,7 +26,7 @@ export default function Dashboard() {
     }).format(value);
   };
 
-  const handleViewDetails = (fatura: Documento) => {
+  const handleViewDetails = (fatura: Invoice) => {
     setSelectedFatura(fatura);
     setDrawerOpen(true);
   };
@@ -112,7 +112,7 @@ export default function Dashboard() {
             ) : recentDocs && recentDocs.length > 0 ? (
               <RecentInvoicesTable 
                 faturas={recentDocs} 
-                onViewDetails={handleViewDetails} 
+                onViewDetail={handleViewDetails} 
               />
             ) : (
               <EmptyState title="Sem faturas" description="Nenhuma fatura encontrada." />

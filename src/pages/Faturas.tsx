@@ -1,12 +1,13 @@
 import { useState } from "react";
 import type { Documento } from "@/types/database";
-import { AppLayout } from "@/components/layout/AppLayout";
-import { FaturaFilters } from "@/components/faturas/FaturaFilters";
-import { FaturasTable } from "@/components/faturas/FaturasTable";
-import { FaturaDetailDrawer } from "@/components/faturas/FaturaDetailDrawer";
+import { AppLayout } from "@/components/common/AppLayout";
+import { FaturaFilters } from "@/features/faturas/FaturaFilters";
+import { FaturasTable } from "@/features/faturas/FaturasTable";
+import { FaturaDetailDrawer } from "@/features/faturas/FaturaDetailDrawer";
 import { LoadingState, ErrorState } from "@/components/ui/states";
-import { useDocumentosFiltered, useCategorias, useTipos, useAnos } from "@/hooks/useSupabase";
+import { useDocumentosFiltered, useCategorias, useTipos, useAnos } from "@/features/faturas/hooks/useFaturas";
 import { useSearchParams } from "react-router-dom";
+import type { Invoice } from "@/types/database";
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -22,7 +23,7 @@ export default function Faturas() {
   const [selectedTipo, setSelectedTipo] = useState("all");
   const [selectedAno, setSelectedAno] = useState("all");
   const [selectedMes, setSelectedMes] = useState("all");
-  const [selectedFatura, setSelectedFatura] = useState<Documento | null>(null);
+  const [selectedFatura, setSelectedFatura] = useState<Invoice | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const { data: documentos, isLoading, error } = useDocumentosFiltered({
@@ -37,7 +38,7 @@ export default function Faturas() {
   const { data: tipos = [] } = useTipos();
   const { data: anos = [] } = useAnos();
 
-  const handleViewDetails = (fatura: Documento) => {
+  const handleViewDetails = (fatura: Invoice) => {
     setSelectedFatura(fatura);
     setDrawerOpen(true);
   };
@@ -106,7 +107,7 @@ export default function Faturas() {
           ) : (
             <FaturasTable 
               faturas={documentos || []} 
-              onViewDetails={handleViewDetails} 
+              onViewDetail={handleViewDetails} 
             />
           )}
         </div>

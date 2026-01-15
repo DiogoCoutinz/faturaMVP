@@ -1,5 +1,5 @@
-import { AppLayout } from "@/components/layout/AppLayout";
-import { UploadZone } from "@/components/upload/UploadZone";
+import { AppLayout } from "@/components/common/AppLayout";
+import { UploadZone } from "@/features/upload/UploadZone";
 
 export default function Upload() {
   return (
