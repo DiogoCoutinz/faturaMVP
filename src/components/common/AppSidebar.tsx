@@ -3,6 +3,7 @@ import {
   LayoutDashboard, 
   FileText, 
   Upload, 
+  Settings,
   Zap,
   Building2,
   ChevronDown,
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Faturas", href: "/faturas", icon: FileText },
   { name: "Upload", href: "/upload", icon: Upload },
+  { name: "Definições", href: "/settings", icon: Settings },
 ];
 
 interface FornecedorStats {

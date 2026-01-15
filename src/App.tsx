@@ -10,6 +10,7 @@ import Faturas from "./pages/Faturas";
 import Upload from "./pages/Upload";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,8 @@ const App = () => (
             <Route path="/faturas" element={<Faturas />} />
             
             <Route path="/upload" element={<Upload />} />
+            
+            <Route path="/settings" element={<Settings />} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
