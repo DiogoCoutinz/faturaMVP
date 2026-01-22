@@ -12,6 +12,7 @@ export interface Invoice {
   // GOOGLE DRIVE (Fase 2: Migração para armazenamento permanente)
   drive_link: string | null; // URL público do Google Drive (quando migrado)
   drive_file_id: string | null; // ID do ficheiro no Google Drive (para manipulação via API)
+  spreadsheet_id: string | null; // ID do Google Sheets (EXTRATO_YEAR)
   
   // DADOS EXTRAÍDOS PELA AI
   document_type: string | null;
@@ -22,6 +23,7 @@ export interface Invoice {
   supplier_vat: string | null;
   doc_number: string | null;
   total_amount: number | null;
+  tax_amount: number | null;
   summary: string | null;
   
   // CONTROLO DE QUALIDADE

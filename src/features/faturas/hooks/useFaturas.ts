@@ -43,14 +43,34 @@ export function useDocumentosFiltered(filters: {
       if (filters.tipo && filters.tipo !== 'all') {
         query = query.eq('document_type', filters.tipo)
       }
-      
+
       const { data, error } = await query
 
       if (error) throw error
       let result = (data || []) as Invoice[]
 
-      if (filters.ano && filters.ano !== 'all') {
-        result = result.filter(d => d.doc_year === parseInt(filters.ano!))
+      // Filtrar por ano
+      if (filters.ano) {
+        const parsedYear = parseInt(filters.ano, 10);
+        if (!isNaN(parsedYear)) {
+          result = result.filter(d => d.doc_year === parsedYear);
+        }
+      }
+
+      // Filtrar por mês (1-12)
+      if (filters.mes) {
+        const parsedMonth = parseInt(filters.mes, 10);
+        if (!isNaN(parsedMonth) && parsedMonth >= 1 && parsedMonth <= 12) {
+          result = result.filter(d => {
+            if (!d.doc_date) return false;
+            const parts = d.doc_date.split('-');
+            if (parts.length >= 2) {
+              const month = parseInt(parts[1], 10);
+              return month === parsedMonth;
+            }
+            return false;
+          });
+        }
       }
 
       return result
@@ -68,23 +88,22 @@ export function useDashboardMetrics() {
 
       const docs = (data || []) as Invoice[]
       
-      const saldoTotal = docs.reduce((acc, d) => acc + (Number(d.total_amount) || 0), 0)
-      const totalGastos = docs.filter(d => (d.total_amount || 0) < 0).reduce((acc, d) => acc + Number(d.total_amount), 0)
-      const totalReceitas = docs.filter(d => (d.total_amount || 0) > 0).reduce((acc, d) => acc + Number(d.total_amount), 0)
-      const uniqueFornecedores = new Set(docs.map(d => d.supplier_name)).size
-      const ultimaFatura = docs.sort((a, b) => {
-        const dateA = a.doc_date ? new Date(a.doc_date).getTime() : 0
-        const dateB = b.doc_date ? new Date(b.doc_date).getTime() : 0
-        return dateB - dateA
-      })[0] || null
-
+      const totalGastos = docs.reduce((acc, d) => acc + Math.abs(Number(d.total_amount) || 0), 0)
+      const custosFixos = docs
+        .filter(d => d.cost_type === 'custo_fixo')
+        .reduce((acc, d) => acc + Math.abs(Number(d.total_amount) || 0), 0)
+      const custosVariaveis = docs
+        .filter(d => d.cost_type === 'custo_variavel')
+        .reduce((acc, d) => acc + Math.abs(Number(d.total_amount) || 0), 0)
+      
+      const countPendente = docs.filter(d => d.status === 'review').length
+      
       return {
         totalFaturas: docs.length,
-        saldoTotal,
         totalGastos,
-        totalReceitas,
-        uniqueFornecedores,
-        ultimaFatura
+        custosFixos,
+        custosVariaveis,
+        countPendente
       }
     },
   })
@@ -108,27 +127,88 @@ export function useRecentDocumentos(limit = 5) {
 }
 
 // Category breakdown for chart
-export function useCategoryBreakdown() {
+export function useCategoryBreakdown(filters?: { startDate?: string; endDate?: string }) {
   return useQuery({
-    queryKey: ['dashboard', 'categories'],
+    queryKey: ['dashboard', 'categories', filters?.startDate, filters?.endDate],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('invoices')
-        .select('cost_type, total_amount')
+        .select('cost_type, total_amount, doc_date')
+
+      if (filters?.startDate) {
+        query = query.gte('doc_date', filters.startDate)
+      }
+      if (filters?.endDate) {
+        query = query.lte('doc_date', filters.endDate)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
 
-      const docs = (data || []) as { cost_type: string | null; total_amount: number | null }[]
+      const docs = (data || []) as { cost_type: string | null; total_amount: number | null; doc_date: string | null }[]
       const categoryTotals: Record<string, number> = {}
       docs.forEach((doc) => {
-        const cat = doc.cost_type || 'Sem categoria'
+        const cat = doc.cost_type === 'custo_fixo' ? 'Custos Fixos' :
+                   doc.cost_type === 'custo_variavel' ? 'Custos Variáveis' :
+                   'Por Classificar'
         categoryTotals[cat] = (categoryTotals[cat] || 0) + (Number(doc.total_amount) || 0)
       })
 
       return Object.entries(categoryTotals)
-        .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
+        .map(([name, value]) => ({ name, value: Math.abs(Math.round(value * 100) / 100) }))
         .sort((a, b) => b.value - a.value)
     },
+  })
+}
+
+// Trends data for line chart
+export function useExpenseTrends() {
+  return useQuery({
+    queryKey: ['dashboard', 'trends'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('doc_date, total_amount, cost_type')
+        .order('doc_date', { ascending: true })
+
+      if (error) throw error
+
+      const docs = (data || []) as { doc_date: string | null; total_amount: number | null; cost_type: string | null }[]
+      
+      // Group by month for now
+      const monthlyData: Record<string, { date: string, fixos: number, variaveis: number, total: number }> = {}
+      
+      docs.forEach(doc => {
+        if (!doc.doc_date) return
+        const date = new Date(doc.doc_date)
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        
+        if (!monthlyData[monthKey]) {
+          monthlyData[monthKey] = { 
+            date: monthKey, 
+            fixos: 0, 
+            variaveis: 0, 
+            total: 0 
+          }
+        }
+        
+        const amount = Math.abs(Number(doc.total_amount) || 0)
+        if (doc.cost_type === 'custo_fixo') {
+          monthlyData[monthKey].fixos += amount
+        } else if (doc.cost_type === 'custo_variavel') {
+          monthlyData[monthKey].variaveis += amount
+        }
+        monthlyData[monthKey].total += amount
+      })
+
+      return Object.values(monthlyData).map(d => ({
+        ...d,
+        fixos: Math.round(d.fixos * 100) / 100,
+        variaveis: Math.round(d.variaveis * 100) / 100,
+        total: Math.round(d.total * 100) / 100,
+      }))
+    }
   })
 }
 

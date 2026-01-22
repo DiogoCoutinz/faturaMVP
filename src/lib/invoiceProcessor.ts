@@ -1,27 +1,30 @@
 import { supabase } from '@/lib/supabase/client';
 import { analyzeInvoiceWithGemini, fileToBase64, type GeminiInvoiceData } from '@/lib/gemini';
+import { uploadInvoiceToDrive, ensureFolder, getOrCreateYearlySheet } from '@/lib/google/drive';
+import { appendInvoiceToSheet } from '@/lib/google/sheets';
 import type { Invoice } from '@/types/database';
 
 export interface UploadResult {
   success: boolean;
   invoice?: Invoice;
   error?: string;
+  isDuplicate?: boolean;
 }
 
 /**
- * FLUXO COMPLETO (FASE 1 - Supabase como Cache):
- * 1. Upload do ficheiro para Supabase Storage (bucket: invoices) [TEMPORÁRIO]
- * 2. Análise com Gemini Vision
- * 3. Inserção na tabela invoices (com storage_path)
- * 
- * FASE 2 (TODO):
- * 4. Upload para Google Drive
- * 5. Atualizar drive_file_id e drive_link na tabela
- * 6. Apagar ficheiro do Supabase Storage
+ * FASE 3: FLUXO COMPLETO COM ARQUITETURA HIERÁRQUICA
+ * 1. Análise com Gemini Vision
+ * 2. Verificar duplicados
+ * 3. Criar estrutura de pastas (FATURAS/Ano/Tipo)
+ * 4. Gestão dinâmica do Excel (EXTRATO_YEAR)
+ * 5. Upload para Google Drive (sub-pasta correta)
+ * 6. Inserir no Supabase
+ * 7. Escrever no Google Sheets
  */
 export async function processInvoiceUpload(
   file: File,
-  userId: string | null = null
+  userId: string | null = null,
+  accessToken: string | null = null // NOVO: Token Google necessário
 ): Promise<UploadResult> {
   try {
     // VALIDAÇÃO
@@ -35,53 +38,98 @@ export async function processInvoiceUpload(
       return { success: false, error: 'Formato não suportado. Use JPG, PNG ou PDF.' };
     }
 
-    // PASSO 1: UPLOAD PARA SUPABASE STORAGE (Cache Temporário)
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-    const storagePath = `uploads/${userId || 'anonymous'}/${fileName}`;
-
-    console.log('📤 Upload para Supabase Storage:', storagePath);
-
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('invoices')
-      .upload(storagePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
-
-    if (uploadError) {
-      console.error('❌ Erro no upload:', uploadError);
+    if (!accessToken) {
       return { 
         success: false, 
-        error: `Erro ao fazer upload: ${uploadError.message}` 
+        error: 'Token Google não disponível. Por favor, conecte o Google em /settings.' 
       };
     }
 
-    // Obter URL público (temporário, até migrar para Drive)
-    const { data: publicUrlData } = supabase.storage
-      .from('invoices')
-      .getPublicUrl(storagePath);
-
-    const fileUrl = publicUrlData.publicUrl;
-    console.log('✅ URL público gerado:', fileUrl);
-
-    // PASSO 2: ANÁLISE COM GEMINI
-    console.log('🤖 Enviando para Gemini AI...');
+    // PASSO 1: ANÁLISE COM GEMINI
+    console.log('🤖 Analisando fatura com IA...');
     const base64Data = await fileToBase64(file);
     const geminiData: GeminiInvoiceData = await analyzeInvoiceWithGemini(base64Data, file.type);
-    console.log('✅ Dados extraídos:', geminiData);
 
-    // PASSO 3: INSERIR NO SUPABASE (com storage_path para referência futura)
+    // PASSO 2: VERIFICAR DUPLICADOS
+    let query = supabase
+      .from('invoices')
+      .select('id, doc_number')
+      .eq('supplier_name', geminiData.supplier_name)
+      .eq('doc_date', geminiData.doc_date)
+      .eq('total_amount', geminiData.total_amount);
+
+    if (geminiData.doc_number) {
+      query = query.eq('doc_number', geminiData.doc_number);
+    }
+
+    const { data: duplicates, error: dupError } = await query;
+
+    if (dupError) {
+      console.error('Erro ao verificar duplicado:', dupError);
+      return { success: false, error: `Erro ao verificar duplicado: ${dupError.message}` };
+    }
+
+    if (duplicates && duplicates.length > 0) {
+      console.warn('⚠️ Fatura DUPLICADA encontrada! ID:', duplicates[0].id);
+      return {
+        success: false,
+        isDuplicate: true,
+        error: `Esta fatura já existe no sistema (${geminiData.supplier_name} - ${geminiData.doc_date})`,
+      };
+    }
+
+    // PASSO 3: CRIAR ESTRUTURA DE PASTAS HIERÁRQUICA
+    const year = geminiData.doc_year || new Date().getFullYear();
+    const rootFolderId = await ensureFolder(accessToken, 'FATURAS');
+    const yearFolderId = await ensureFolder(accessToken, year.toString(), rootFolderId);
+
+    let costTypeFolderName = 'Por Classificar';
+    if (geminiData.cost_type === 'custo_fixo') {
+      costTypeFolderName = 'Custos Fixos';
+    } else if (geminiData.cost_type === 'custo_variavel') {
+      costTypeFolderName = 'Custos Variáveis';
+    }
+
+    const costTypeFolderId = await ensureFolder(accessToken, costTypeFolderName, yearFolderId);
+    console.log(`📂 Estrutura: FATURAS/${year}/${costTypeFolderName}`);
+
+    // PASSO 4: GESTÃO DINÂMICA DO EXCEL
+    const spreadsheetId = await getOrCreateYearlySheet(accessToken, year, yearFolderId);
+
+    // PASSO 5: UPLOAD PARA GOOGLE DRIVE
+    const pdfFileName = `${geminiData.doc_date}_${geminiData.supplier_name}_${geminiData.total_amount?.toFixed(2) || '0.00'}.pdf`
+      .replace(/[/\\?%*:|"<>]/g, '_');
+
+    // Converter File para Uint8Array (com tratamento de erro)
+    let uint8Array: Uint8Array;
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      uint8Array = new Uint8Array(arrayBuffer);
+    } catch (readError) {
+      console.error('❌ Erro ao ler ficheiro:', readError);
+      return {
+        success: false,
+        error: 'Não foi possível ler o ficheiro. O ficheiro pode estar corrompido ou inacessível.'
+      };
+    }
+
+    const driveFile = await uploadInvoiceToDrive(
+      accessToken,
+      uint8Array,
+      pdfFileName,
+      costTypeFolderId
+    );
+
+    // PASSO 6: INSERIR NO SUPABASE
     const invoiceData = {
       user_id: userId,
-      
-      // STORAGE (Cache temporário)
-      file_url: fileUrl, // URL público do Supabase
-      storage_path: storagePath, // Caminho interno no bucket
-      
-      // GOOGLE DRIVE (NULL por enquanto, será preenchido na Fase 2)
-      drive_link: null, // TODO: Será preenchido após upload para Drive
-      drive_file_id: null, // TODO: ID do ficheiro no Google Drive
+
+      // STORAGE (Google Drive permanente)
+      file_url: driveFile.webViewLink,
+      storage_path: null, // Não usamos Supabase Storage
+      drive_link: driveFile.webViewLink,
+      drive_file_id: driveFile.id,
+      spreadsheet_id: spreadsheetId, // ID do Excel (EXTRATO_YEAR)
       
       // DADOS EXTRAÍDOS
       document_type: geminiData.document_type,
@@ -107,23 +155,30 @@ export async function processInvoiceUpload(
 
     if (insertError) {
       console.error('❌ Erro ao inserir no DB:', insertError);
-      // Rollback: Apagar o ficheiro do storage se o insert falhar
-      console.log('🗑️ Removendo ficheiro do storage (rollback)...');
-      await supabase.storage.from('invoices').remove([storagePath]);
-      
       return { 
         success: false, 
         error: `Erro ao guardar dados: ${insertError.message}` 
       };
     }
 
-    console.log('✅ Fatura processada com sucesso! ID:', invoice.id);
-    
-    // TODO (FASE 2): Migrar ficheiro para Google Drive
-    // 1. Upload do ficheiro para Google Drive usando a Google Drive API
-    // 2. Obter drive_file_id e drive_link
-    // 3. UPDATE invoices SET drive_file_id = ?, drive_link = ?, status = 'migrated' WHERE id = ?
-    // 4. DELETE ficheiro do Supabase Storage: supabase.storage.from('invoices').remove([storagePath])
+    // PASSO 7: ESCREVER NO GOOGLE SHEETS
+    try {
+      await appendInvoiceToSheet(accessToken, spreadsheetId, {
+        doc_date: geminiData.doc_date,
+        supplier_name: geminiData.supplier_name,
+        supplier_vat: geminiData.supplier_vat,
+        cost_type: geminiData.cost_type,
+        doc_number: geminiData.doc_number,
+        total_amount: geminiData.total_amount,
+        tax_amount: geminiData.tax_amount,
+        summary: geminiData.summary,
+        drive_link: driveFile.webViewLink,
+      });
+    } catch (sheetsError) {
+      console.warn('⚠️ Erro ao escrever no Sheets:', sheetsError);
+    }
+
+    console.log(`✅ Fatura processada: ${geminiData.supplier_name} - ${geminiData.total_amount}€`);
     
     return { 
       success: true, 

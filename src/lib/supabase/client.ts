@@ -1,7 +1,15 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://tzedvuwqmbpdpcuowsfx.supabase.co'
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY)
+// Validar variáveis de ambiente em desenvolvimento
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('❌ ERRO: Variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY são obrigatórias no .env');
+}
+
+export const supabase = createClient<Database>(
+  SUPABASE_URL || '',
+  SUPABASE_ANON_KEY || ''
+)

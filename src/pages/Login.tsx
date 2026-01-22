@@ -65,7 +65,7 @@ export default function Login() {
         <CardHeader className="text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <FileText className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold">FaturaAI</span>
+            <span className="text-2xl font-bold">Equipa Francisco Brito</span>
           </div>
           <CardTitle>Bem-vindo</CardTitle>
           <CardDescription>

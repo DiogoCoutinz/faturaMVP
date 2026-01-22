@@ -6,7 +6,18 @@ if (!GEMINI_API_KEY) {
   console.warn('⚠️ VITE_GEMINI_API_KEY não configurada no .env');
 }
 
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+// Lazy initialization - só cria quando API key existir
+let genAI: GoogleGenerativeAI | null = null;
+
+function getGenAI(): GoogleGenerativeAI {
+  if (!GEMINI_API_KEY) {
+    throw new Error('VITE_GEMINI_API_KEY não está configurada. Adicione ao ficheiro .env');
+  }
+  if (!genAI) {
+    genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  }
+  return genAI;
+}
 
 /**
  * Prompt de sistema para análise contabilística
@@ -16,6 +27,12 @@ Atua como um CONTABILISTA SÉNIOR especializado em imobiliário e automação de
 
 # OBJECTIVO
 Processar imagens/PDFs e devolver um JSON estruturado para classificação de custos (FIXOS vs VARIÁVEIS), garantindo que nada se perde.
+
+# VALIDAÇÃO INICIAL (CRÍTICO)
+Antes de tudo, verifica se a imagem/documento é realmente uma FATURA, RECIBO ou documento financeiro válido.
+- Se for uma foto de pessoa, selfie, paisagem, objeto aleatório, meme, etc. → is_valid_document = false
+- Se for um documento financeiro legível (fatura, recibo, nota de crédito) → is_valid_document = true
+- Se for um documento mas ilegível/muito desfocado → is_valid_document = false, rejection_reason = "documento_ilegivel"
 
 # REGRAS DE CLASSIFICAÇÃO (CRÍTICO)
 
@@ -42,33 +59,39 @@ Processar imagens/PDFs e devolver um JSON estruturado para classificação de cu
 Deves responder APENAS com este objeto JSON, sem markdown, sem texto antes ou depois:
 
 {
-  "document_type": "fatura" | "nota_credito" | "outro",
+  "is_valid_document": boolean,
+  "rejection_reason": "nao_e_documento" | "documento_ilegivel" | "nao_e_fatura" | null,
+  "document_type": "fatura" | "nota_credito" | "recibo" | "outro" | null,
   "cost_type": "custo_fixo" | "custo_variavel" | null,
-  "doc_year": number,
-  "doc_date": "YYYY-MM-DD",
-  "supplier_name": "string",
+  "doc_year": number | null,
+  "doc_date": "YYYY-MM-DD" | null,
+  "supplier_name": "string" | null,
   "supplier_vat": "string" | null,
-  "doc_number": "string",
-  "total_amount": number,
+  "doc_number": "string" | null,
+  "total_amount": number | null,
   "tax_amount": number | null,
-  "summary": "string",
+  "summary": "string" | null,
   "confidence_score": number (0-100)
-}`;
+}
+
+Se is_valid_document = false, podes deixar os outros campos como null.`;
 
 /**
  * Interface do resultado esperado do Gemini
  */
 export interface GeminiInvoiceData {
-  document_type: 'fatura' | 'nota_credito' | 'outro';
+  is_valid_document: boolean;
+  rejection_reason?: 'nao_e_documento' | 'documento_ilegivel' | 'nao_e_fatura' | null;
+  document_type: 'fatura' | 'nota_credito' | 'recibo' | 'outro' | null;
   cost_type: 'custo_fixo' | 'custo_variavel' | null;
-  doc_year: number;
-  doc_date: string;
-  supplier_name: string;
+  doc_year: number | null;
+  doc_date: string | null;
+  supplier_name: string | null;
   supplier_vat: string | null;
-  doc_number: string;
-  total_amount: number;
+  doc_number: string | null;
+  total_amount: number | null;
   tax_amount?: number | null;
-  summary: string;
+  summary: string | null;
   confidence_score: number;
 }
 
@@ -82,9 +105,9 @@ export async function analyzeInvoiceWithGemini(
   mimeType: string
 ): Promise<GeminiInvoiceData> {
   try {
-    // Usar modelo Gemini 2.0 Flash (mais rápido) ou 1.5 Pro
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.0-flash-exp' // ou 'gemini-1.5-pro'
+    // Usar modelo Gemini 2.5 Pro (mais potente para análise de imagem)
+    const model = getGenAI().getGenerativeModel({
+      model: 'gemini-2.5-pro'
     });
 
     const imagePart = {
@@ -109,9 +132,20 @@ export async function analyzeInvoiceWithGemini(
     // Parse do JSON
     const data: GeminiInvoiceData = JSON.parse(cleanedText);
 
-    // Validação básica
-    if (!data.supplier_name || !data.doc_date || data.total_amount === undefined) {
-      throw new Error('Dados incompletos extraídos pelo Gemini');
+    // Verificar se é um documento válido
+    if (!data.is_valid_document) {
+      const errorMessages: Record<string, string> = {
+        'nao_e_documento': 'Isto não parece ser uma fatura ou documento financeiro. Por favor, envie uma imagem de fatura, recibo ou nota de crédito.',
+        'documento_ilegivel': 'O documento está ilegível ou muito desfocado. Por favor, envie uma imagem com melhor qualidade.',
+        'nao_e_fatura': 'Este documento não é uma fatura de despesa. Apenas faturas de gastos/custos são aceites.',
+      };
+      const reason = data.rejection_reason || 'nao_e_documento';
+      throw new Error(errorMessages[reason] || errorMessages['nao_e_documento']);
+    }
+
+    // Validação básica dos campos necessários
+    if (!data.supplier_name || !data.doc_date || data.total_amount === undefined || data.total_amount === null) {
+      throw new Error('Não foi possível extrair todos os dados da fatura. Verifique se a imagem está completa e legível.');
     }
 
     return data;
@@ -135,7 +169,12 @@ export async function fileToBase64(file: File): Promise<string> {
     reader.onload = () => {
       const result = reader.result as string;
       // Remover o prefixo "data:image/jpeg;base64," para enviar só a string
-      const base64 = result.split(',')[1];
+      const parts = result.split(',');
+      if (parts.length < 2 || !parts[1]) {
+        reject(new Error('Formato de ficheiro inválido ou ficheiro corrompido'));
+        return;
+      }
+      const base64 = parts[1];
       resolve(base64);
     };
     reader.onerror = (error) => reject(error);

@@ -6,7 +6,7 @@
 - Prompt de sistema para atuar como Contabilista Sénior
 - Análise de imagem/PDF com extração de dados estruturados
 - Classificação automática de custos (fixos vs variáveis)
-- Modelo: `gemini-2.0-flash-exp` (mais rápido) ou `gemini-1.5-pro`
+- Modelo: `gemini-2.5-pro` (recomendado para maior precisão em imagens)
 
 ### 2. **Processador de Invoices** (`src/lib/invoiceProcessor.ts`)
 - **Fluxo completo**:

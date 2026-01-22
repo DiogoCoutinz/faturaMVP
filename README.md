@@ -1,4 +1,4 @@
-# FaturaAI - Gestão Inteligente de Faturas
+# Equipa Francisco Brito - Gestão de Faturas
 
 Sistema de gestão de faturas com integração Supabase e processamento inteligente.
 

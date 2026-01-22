@@ -24,14 +24,14 @@ const AuthContext = createContext<AuthContextType>({
 
 /**
  * SCOPES NECESSÁRIOS PARA AUTOMAÇÃO COMPLETA
- * - Gmail: Ler emails com faturas
+ * - Gmail: Ler emails com faturas + marcar como lido
  * - Drive: Criar pastas e guardar PDFs
  * - Sheets: Escrever dados no dashboard
  */
 const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
-  'https://www.googleapis.com/auth/gmail.readonly', // Ler emails
+  'https://www.googleapis.com/auth/gmail.modify', // Ler emails + marcar como lido (era .readonly)
   'https://www.googleapis.com/auth/drive.file', // Upload ficheiros
   'https://www.googleapis.com/auth/spreadsheets', // Escrever sheets
 ].join(' ');

@@ -1,13 +1,8 @@
 /**
- * GOOGLE GMAIL SERVICE
- * Responsável por ler emails e extrair anexos (faturas)
- * 
- * REQUISITOS:
- * - Provider Token do Supabase Auth (OAuth Google)
- * - Scope: https://www.googleapis.com/auth/gmail.readonly
+ * GOOGLE GMAIL REST API (Browser-Compatible)
+ * Usa fetch direto para leitura de emails
+ * Docs: https://developers.google.com/gmail/api/reference/rest
  */
-
-import { google } from 'googleapis';
 
 export interface GmailMessage {
   id: string;
@@ -24,160 +19,244 @@ export interface GmailAttachment {
   mimeType: string;
   size: number;
   attachmentId: string;
-  data?: string; // Base64 encoded
 }
 
 /**
- * Cria cliente do Gmail autenticado
+ * FASE 2A: Lista emails não lidos com anexos (faturas)
+ * Query ESTRITA para evitar lixo: apenas emails recentes de 2026
  */
-export function createGmailClient(accessToken: string) {
-  const auth = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: accessToken });
-  
-  return google.gmail({ version: 'v1', auth });
-}
-
-/**
- * Lista emails com filtro (ex: label:INBOX, has:attachment)
- * @param accessToken - Token OAuth
- * @param query - Query de pesquisa (ex: "subject:fatura has:attachment")
- * @param maxResults - Número máximo de resultados
- */
-export async function listEmails(
+export async function listUnreadInvoices(
   accessToken: string,
-  query: string = 'has:attachment',
-  maxResults: number = 10
+  maxResults: number = 20
 ): Promise<GmailMessage[]> {
-  try {
-    const gmail = createGmailClient(accessToken);
+  const currentYear = new Date().getFullYear();
+  
+  const query = [
+    'label:unread',
+    'has:attachment',
+    `subject:(fatura OR invoice OR recibo)`,
+    `after:${currentYear}/01/01`, // Apenas emails do ano corrente
+  ].join(' ');
 
-    const response = await gmail.users.messages.list({
-      userId: 'me',
-      q: query,
-      maxResults: maxResults,
-    });
+  console.log('🔍 Query Gmail:', query);
+  console.log('📅 Filtrando apenas emails de:', currentYear);
 
-    if (!response.data.messages) {
-      console.log('📧 Nenhum email encontrado com a query:', query);
-      return [];
+  const response = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(query)}&maxResults=${maxResults}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
     }
+  );
 
-    // Buscar detalhes de cada mensagem
-    const messages: GmailMessage[] = [];
+  if (!response.ok) {
+    throw new Error(`Erro ao listar emails: ${response.status}`);
+  }
 
-    for (const message of response.data.messages) {
-      const details = await gmail.users.messages.get({
-        userId: 'me',
-        id: message.id!,
-        format: 'metadata',
-        metadataHeaders: ['Subject', 'From', 'Date'],
-      });
+  const data = await response.json();
 
-      const headers = details.data.payload?.headers || [];
-      const subject = headers.find(h => h.name === 'Subject')?.value || '(sem assunto)';
-      const from = headers.find(h => h.name === 'From')?.value || '(desconhecido)';
-      const date = headers.find(h => h.name === 'Date')?.value || '';
+  if (!data.messages) {
+    console.log('📧 Nenhum email encontrado');
+    return [];
+  }
+
+  // Buscar detalhes de cada mensagem (FORMATO COMPLETO, como no n8n)
+  const messages: GmailMessage[] = [];
+
+  for (const msg of data.messages) {
+    const details = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, // SEM format=metadata (busca completo)
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (details.ok) {
+      const detailData = await details.json();
+      const headers = detailData.payload?.headers || [];
 
       messages.push({
-        id: message.id!,
-        threadId: message.threadId!,
-        subject,
-        from,
-        date,
-        snippet: details.data.snippet || '',
-        hasAttachments: !!(details.data.payload?.parts?.some(p => p.filename)),
+        id: msg.id,
+        threadId: msg.threadId,
+        subject: headers.find((h: any) => h.name === 'Subject')?.value || '(sem assunto)',
+        from: headers.find((h: any) => h.name === 'From')?.value || '(desconhecido)',
+        date: headers.find((h: any) => h.name === 'Date')?.value || '',
+        snippet: detailData.snippet || '',
+        hasAttachments: !!(detailData.payload?.parts?.some((p: any) => p.filename)),
       });
     }
-
-    console.log(`✅ ${messages.length} emails encontrados`);
-    return messages;
-  } catch (error) {
-    console.error('❌ Erro ao listar emails:', error);
-    throw error;
   }
+
+  console.log(`✅ ${messages.length} emails encontrados`);
+  return messages;
 }
 
 /**
  * Obtém anexos de um email específico
- * @param accessToken - Token OAuth
- * @param messageId - ID da mensagem
+ * RECURSIVO para lidar com emails multipart/nested (IGUAL AO N8N)
  */
 export async function getEmailAttachments(
   accessToken: string,
   messageId: string
 ): Promise<GmailAttachment[]> {
-  try {
-    const gmail = createGmailClient(accessToken);
+  // BUSCAR MENSAGEM COMPLETA (como n8n faz com "Get a message")
+  const response = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}`, // SEM format=metadata
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
 
-    const message = await gmail.users.messages.get({
-      userId: 'me',
-      id: messageId,
-    });
+  if (!response.ok) {
+    throw new Error(`Erro ao buscar anexos: ${response.status}`);
+  }
 
-    const parts = message.data.payload?.parts || [];
-    const attachments: GmailAttachment[] = [];
+  const data = await response.json();
+  const attachments: GmailAttachment[] = [];
 
-    for (const part of parts) {
-      if (part.filename && part.body?.attachmentId) {
+  console.log('🔍 DEBUG getEmailAttachments:');
+  console.log('   - messageId:', messageId);
+  console.log('   - payload.mimeType:', data.payload?.mimeType);
+  console.log('   - payload.parts:', data.payload?.parts?.length || 0);
+  console.log('📋 PAYLOAD COMPLETO (JSON):', JSON.stringify(data.payload, null, 2));
+
+  // Função recursiva para encontrar anexos em parts aninhados
+  function findAttachments(parts: any[], depth: number = 0): void {
+    const indent = '  '.repeat(depth + 1);
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      console.log(`${indent}Part[${i}]: ${part.mimeType} | filename: ${part.filename || '(vazio)'} | attachmentId: ${part.body?.attachmentId ? 'SIM' : 'NÃO'}`);
+      
+      // Se tem filename E attachmentId → é anexo VÁLIDO
+      if (part.filename && part.filename.length > 0 && part.body?.attachmentId) {
+        console.log(`${indent}✅ ANEXO ENCONTRADO: "${part.filename}"`);
+        console.log(`${indent}   → Attachment ID COMPLETO: ${part.body.attachmentId}`);
+        console.log(`${indent}   → MimeType: ${part.mimeType}`);
+        console.log(`${indent}   → Size: ${part.body.size} bytes`);
         attachments.push({
           filename: part.filename,
-          mimeType: part.mimeType || 'application/octet-stream',
+          mimeType: part.mimeType || 'application/pdf',
           size: part.body.size || 0,
           attachmentId: part.body.attachmentId,
         });
+      } else {
+        // Debug de parts que NÃO são anexos
+        if (part.filename) {
+          console.log(`${indent}⚠️ Part tem filename mas SEM attachmentId:`, part.filename);
+        }
+      }
+      
+      // Se tem sub-parts, procurar recursivamente
+      if (part.parts && Array.isArray(part.parts)) {
+        console.log(`${indent}↳ Entrando em ${part.parts.length} sub-parts...`);
+        findAttachments(part.parts, depth + 1);
       }
     }
+  }
 
-    console.log(`📎 ${attachments.length} anexos encontrados no email ${messageId}`);
-    return attachments;
+  if (data.payload?.parts) {
+    findAttachments(data.payload.parts);
+  }
+
+  console.log(`✅ Total de ${attachments.length} anexos encontrados no email ${messageId}`);
+  
+  if (attachments.length === 0) {
+    console.warn('⚠️ NENHUM ANEXO ENCONTRADO! Payload completo:', JSON.stringify(data.payload, null, 2));
+  }
+  
+  return attachments;
+}
+
+/**
+ * FASE 2A: Download direto do anexo (Simplificado)
+ * Confia no attachmentId recebido da listagem inicial
+ */
+export async function getAttachmentData(
+  accessToken: string,
+  messageId: string,
+  attachmentId: string,
+  filename: string = 'anexo.pdf',
+  mimeType: string = 'application/pdf'
+): Promise<{ data: Uint8Array; filename: string; mimeType: string }> {
+  try {
+    console.log(`📥 Download direto iniciado: ${filename}`);
+    console.log(`   - ID Anexo: ${attachmentId.substring(0, 50)}...`);
+    
+    // Chamada direta ao endpoint de anexos do Gmail
+    const response = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Erro ao baixar anexo: ${response.status} - ${errorText}`);
+    }
+
+    const attachmentData = await response.json();
+
+    if (!attachmentData.data) {
+      throw new Error('Resposta da API não contém dados (base64)');
+    }
+
+    // Converter base64url → base64 → Uint8Array
+    const base64Data = attachmentData.data
+      .replace(/-/g, '+')
+      .replace(/_/g, '/');
+
+    // Decode base64 para Uint8Array (compatível com browser e node)
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    console.log(`✅ Download concluído: ${filename} (${(bytes.length / 1024).toFixed(2)} KB)`);
+
+    return {
+      data: bytes,
+      filename,
+      mimeType,
+    };
   } catch (error) {
-    console.error('❌ Erro ao buscar anexos:', error);
+    console.error('❌ Erro crítico no download direto:', error);
     throw error;
   }
 }
 
 /**
- * Download de anexo específico
- * @param accessToken - Token OAuth
- * @param messageId - ID da mensagem
- * @param attachmentId - ID do anexo
+ * FASE 2A: Marca email como lido
  */
-export async function downloadAttachment(
+export async function markEmailAsRead(
   accessToken: string,
-  messageId: string,
-  attachmentId: string
-): Promise<{ data: string; mimeType: string }> {
-  try {
-    const gmail = createGmailClient(accessToken);
-
-    const attachment = await gmail.users.messages.attachments.get({
-      userId: 'me',
-      messageId: messageId,
-      id: attachmentId,
-    });
-
-    if (!attachment.data.data) {
-      throw new Error('Anexo vazio');
+  messageId: string
+): Promise<void> {
+  const response = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        removeLabelIds: ['UNREAD'],
+      }),
     }
+  );
 
-    // O Gmail retorna em base64url, precisamos converter para base64 normal
-    const base64Data = attachment.data.data
-      .replace(/-/g, '+')
-      .replace(/_/g, '/');
-
-    console.log('✅ Anexo baixado com sucesso');
-    return {
-      data: base64Data,
-      mimeType: 'application/pdf', // Assumindo PDF por padrão
-    };
-  } catch (error) {
-    console.error('❌ Erro ao baixar anexo:', error);
-    throw error;
+  if (!response.ok) {
+    throw new Error(`Erro ao marcar como lido: ${response.status}`);
   }
-}
 
-// TODO (Fase 2 - Automação):
-// - Marcar emails como lidos após processar
-// - Filtrar emails por remetente específico (ex: fornecedores conhecidos)
-// - Webhook/Polling para emails novos
-// - Gestão de erros de rate limit do Gmail API
+  console.log('✅ Email marcado como lido:', messageId);
+}

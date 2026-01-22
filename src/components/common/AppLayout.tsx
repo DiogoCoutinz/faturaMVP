@@ -1,16 +1,22 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { AppSidebar } from "./AppSidebar";
+import { cn } from "@/lib/utils";
 
 interface AppLayoutProps {
   children: ReactNode;
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   return (
     <div className="min-h-screen bg-background">
-      <AppSidebar />
-      <main className="pl-64">
-        <div className="min-h-screen p-6 lg:p-8">
+      <AppSidebar isCollapsed={isSidebarCollapsed} onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)} />
+      <main className={cn(
+        "transition-all duration-300 ease-in-out",
+        isSidebarCollapsed ? "pl-20" : "pl-64"
+      )}>
+        <div className="min-h-screen p-6 lg:p-8 max-w-[1600px] mx-auto">
           {children}
         </div>
       </main>

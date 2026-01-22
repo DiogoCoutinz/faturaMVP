@@ -1,66 +1,73 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface CategoryChartProps {
   data: { name: string; value: number }[];
 }
+
+const COLORS = ["#0E2435", "#BBB388", "#1a3a52", "#cfc9a8"];
 
 export function CategoryChart({ data }: CategoryChartProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-PT", {
       style: "currency",
       currency: "EUR",
+      maximumFractionDigits: 0,
     }).format(value);
   };
 
-  // Sort by absolute value descending
-  const sortedData = [...data].sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
-
   return (
-    <div className="rounded-xl border border-border bg-card p-6 shadow-card">
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-card-foreground">Valores por Categoria</h3>
-        <p className="text-sm text-muted-foreground">
-          <span className="text-accent">Verde = Receitas</span> | <span className="text-destructive">Vermelho = Gastos</span>
-        </p>
-      </div>
-      <div className="h-[300px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={sortedData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-            <XAxis 
-              type="number" 
-              tickFormatter={(value) => `${value >= 0 ? '' : '-'}${Math.abs(value).toFixed(0)}€`}
-              stroke="hsl(var(--muted-foreground))"
-            />
-            <YAxis 
-              type="category" 
-              dataKey="name" 
-              width={100}
-              tick={{ fontSize: 12 }}
-              stroke="hsl(var(--muted-foreground))"
-            />
-            <Tooltip
-              formatter={(value: number) => [formatCurrency(value), "Valor"]}
-              contentStyle={{
-                backgroundColor: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "8px",
-                boxShadow: "var(--shadow-md)",
-              }}
-              labelStyle={{ color: "hsl(var(--card-foreground))" }}
-            />
-            <ReferenceLine x={0} stroke="hsl(var(--muted-foreground))" />
-            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-              {sortedData.map((entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
-                  fill={entry.value >= 0 ? "hsl(162, 72%, 45%)" : "hsl(0, 84%, 60%)"} 
+    <Card className="h-full border-none shadow-card hover:shadow-card-hover transition-all duration-300">
+      <CardHeader>
+        <CardTitle className="text-lg font-semibold flex items-center justify-between">
+          Divisão de Custos
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[280px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={80}
+                paddingAngle={5}
+                dataKey="value"
+                stroke="none"
+              >
+                {data.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'hsl(var(--card))', 
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '12px',
+                  boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
+                }}
+                formatter={(value: number) => [formatCurrency(value), 'Total']}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="mt-4 space-y-3">
+          {data.map((item, index) => (
+            <div key={item.name} className="flex items-center justify-between text-sm group">
+              <div className="flex items-center gap-2">
+                <div 
+                  className="h-2.5 w-2.5 rounded-full transition-transform group-hover:scale-125" 
+                  style={{ backgroundColor: COLORS[index % COLORS.length] }} 
                 />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+                <span className="text-muted-foreground font-medium">{item.name}</span>
+              </div>
+              <span className="font-bold">{formatCurrency(item.value)}</span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
