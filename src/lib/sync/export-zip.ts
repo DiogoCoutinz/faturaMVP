@@ -4,10 +4,45 @@ import { toast } from 'sonner';
 
 interface InvoiceToExport {
   supplier_name: string | null;
+  supplier_vat?: string | null;
   doc_date: string | null;
+  doc_number?: string | null;
   total_amount: number | null;
+  cost_type?: string | null;
+  document_type?: string | null;
+  summary?: string | null;
   drive_file_id: string | null;
   drive_link: string | null;
+}
+
+// Exportar para CSV
+export function exportInvoicesToCSV(invoices: InvoiceToExport[], fileName: string = 'faturas.csv') {
+  if (!invoices.length) {
+    toast.error('Nenhuma fatura para exportar');
+    return;
+  }
+
+  const headers = ['Data', 'Fornecedor', 'NIF', 'Nº Documento', 'Categoria', 'Tipo', 'Valor', 'Resumo'];
+
+  const rows = invoices.map(inv => [
+    inv.doc_date || '',
+    inv.supplier_name || '',
+    inv.supplier_vat || '',
+    inv.doc_number || '',
+    inv.cost_type === 'custo_fixo' ? 'Custo Fixo' : inv.cost_type === 'custo_variavel' ? 'Custo Variável' : '',
+    inv.document_type || '',
+    (inv.total_amount || 0).toFixed(2).replace('.', ','),
+    inv.summary || ''
+  ]);
+
+  const csvContent = [
+    headers.join(';'),
+    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
+  ].join('\n');
+
+  const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  saveAs(blob, fileName);
+  toast.success(`Exportação CSV de ${invoices.length} faturas concluída!`);
 }
 
 export async function exportInvoicesToZip(

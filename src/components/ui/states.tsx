@@ -10,7 +10,7 @@ export function LoadingState({ message = "A carregar...", className }: LoadingSt
   return (
     <div className={cn("flex flex-col items-center justify-center py-16", className)}>
       <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      <p className="mt-4 text-sm text-muted-foreground">{message}</p>
+      <p className="mt-4 text-sm font-medium text-foreground">{message}</p>
     </div>
   );
 }
@@ -37,7 +37,7 @@ export function EmptyState({
         {icon || <FileText className="h-8 w-8 text-muted-foreground" />}
       </div>
       <h3 className="mt-4 text-lg font-medium text-card-foreground">{title}</h3>
-      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      <p className="mt-1 text-sm font-medium text-foreground/80">{description}</p>
     </div>
   );
 }
@@ -62,7 +62,7 @@ export function ErrorState({
         <AlertCircle className="h-8 w-8 text-destructive" />
       </div>
       <h3 className="mt-4 text-lg font-medium text-card-foreground">{title}</h3>
-      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      <p className="mt-1 text-sm font-medium text-foreground/80">{description}</p>
     </div>
   );
 }

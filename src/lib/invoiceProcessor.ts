@@ -50,19 +50,32 @@ export async function processInvoiceUpload(
     const base64Data = await fileToBase64(file);
     const geminiData: GeminiInvoiceData = await analyzeInvoiceWithGemini(base64Data, file.type);
 
-    // PASSO 2: VERIFICAR DUPLICADOS
-    let query = supabase
-      .from('invoices')
-      .select('id, doc_number')
-      .eq('supplier_name', geminiData.supplier_name)
-      .eq('doc_date', geminiData.doc_date)
-      .eq('total_amount', geminiData.total_amount);
+    // NORMALIZAR NOME DO FORNECEDOR
+    geminiData.supplier_name = geminiData.supplier_name?.toUpperCase().trim() || null;
+
+    // PASSO 2: VERIFICAR DUPLICADOS (doc_number primeiro, depois combinação de campos)
+    let isDuplicate = false;
 
     if (geminiData.doc_number) {
-      query = query.eq('doc_number', geminiData.doc_number);
+      const { data: docDups } = await supabase
+        .from('invoices')
+        .select('id')
+        .ilike('doc_number', geminiData.doc_number);
+      if (docDups && docDups.length > 0) isDuplicate = true;
     }
 
-    const { data: duplicates, error: dupError } = await query;
+    if (!isDuplicate) {
+      const { data: fieldDups } = await supabase
+        .from('invoices')
+        .select('id')
+        .ilike('supplier_name', geminiData.supplier_name || '')
+        .eq('doc_date', geminiData.doc_date)
+        .eq('total_amount', geminiData.total_amount);
+      if (fieldDups && fieldDups.length > 0) isDuplicate = true;
+    }
+
+    const duplicates = isDuplicate ? [{ id: 'dup' }] : null;
+    const dupError = null;
 
     if (dupError) {
       console.error('Erro ao verificar duplicado:', dupError);

@@ -23,79 +23,63 @@ export function UploadZone() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const abortRef = useRef(false);
+  const processingRef = useRef(false);
 
   // Processar ficheiros em fila
   useEffect(() => {
-    if (!isProcessing || fileStatuses.length === 0) return;
+    if (!isProcessing || processingRef.current) return;
 
-    const processNext = async () => {
-      const pendingIndex = fileStatuses.findIndex(f => f.status === 'pending');
-      if (pendingIndex === -1 || abortRef.current) {
-        setIsProcessing(false);
-        return;
-      }
+    processingRef.current = true;
 
-      setCurrentIndex(pendingIndex);
-      const file = fileStatuses[pendingIndex].file;
+    const processQueue = async (statuses: FileUploadStatus[]) => {
+      for (let i = 0; i < statuses.length; i++) {
+        if (abortRef.current) break;
 
-      // Marcar como uploading
-      setFileStatuses(prev => prev.map((f, i) =>
-        i === pendingIndex ? { ...f, status: 'uploading', message: 'A carregar...' } : f
-      ));
+        setCurrentIndex(i);
 
-      // Pequena pausa para UI update
-      await new Promise(r => setTimeout(r, 300));
+        // Marcar como uploading
+        setFileStatuses(prev => prev.map((f, idx) =>
+          idx === i ? { ...f, status: 'uploading', message: 'A carregar...' } : f
+        ));
 
-      // Marcar como analyzing
-      setFileStatuses(prev => prev.map((f, i) =>
-        i === pendingIndex ? { ...f, status: 'analyzing', message: 'A analisar com IA...' } : f
-      ));
+        await new Promise(r => setTimeout(r, 300));
 
-      try {
-        const result = await processInvoiceUpload(file, user?.id || null, providerToken!);
+        // Marcar como analyzing
+        setFileStatuses(prev => prev.map((f, idx) =>
+          idx === i ? { ...f, status: 'analyzing', message: 'A analisar com IA...' } : f
+        ));
 
-        if (result.success && result.invoice) {
-          setFileStatuses(prev => prev.map((f, i) =>
-            i === pendingIndex ? {
-              ...f,
-              status: 'success',
-              message: 'Processado!',
-              invoice: result.invoice
-            } : f
-          ));
-        } else if (result.isDuplicate) {
-          setFileStatuses(prev => prev.map((f, i) =>
-            i === pendingIndex ? {
-              ...f,
-              status: 'duplicate',
-              message: 'Duplicado'
-            } : f
-          ));
-        } else {
-          setFileStatuses(prev => prev.map((f, i) =>
-            i === pendingIndex ? {
-              ...f,
-              status: 'error',
-              message: result.error || 'Erro'
-            } : f
+        try {
+          const result = await processInvoiceUpload(statuses[i].file, user?.id || null, providerToken!);
+
+          if (result.success && result.invoice) {
+            setFileStatuses(prev => prev.map((f, idx) =>
+              idx === i ? { ...f, status: 'success', message: 'Processado!', invoice: result.invoice } : f
+            ));
+          } else if (result.isDuplicate) {
+            setFileStatuses(prev => prev.map((f, idx) =>
+              idx === i ? { ...f, status: 'duplicate', message: 'Duplicado' } : f
+            ));
+          } else {
+            setFileStatuses(prev => prev.map((f, idx) =>
+              idx === i ? { ...f, status: 'error', message: result.error || 'Erro' } : f
+            ));
+          }
+        } catch (error) {
+          setFileStatuses(prev => prev.map((f, idx) =>
+            idx === i ? { ...f, status: 'error', message: error instanceof Error ? error.message : 'Erro' } : f
           ));
         }
-      } catch (error) {
-        setFileStatuses(prev => prev.map((f, i) =>
-          i === pendingIndex ? {
-            ...f,
-            status: 'error',
-            message: error instanceof Error ? error.message : 'Erro'
-          } : f
-        ));
+
+        await new Promise(r => setTimeout(r, 500));
       }
 
-      // Processar próximo
-      setTimeout(processNext, 500);
+      setIsProcessing(false);
+      processingRef.current = false;
     };
 
-    processNext();
-  }, [isProcessing, fileStatuses, user, providerToken]);
+    processQueue(fileStatuses);
+  }, [isProcessing]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
@@ -146,6 +130,7 @@ export function UploadZone() {
   const resetUpload = () => {
     abortRef.current = true;
     setIsProcessing(false);
+    processingRef.current = false;
     setFileStatuses([]);
     setCurrentIndex(0);
   };

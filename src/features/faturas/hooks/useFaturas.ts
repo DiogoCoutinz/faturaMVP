@@ -25,6 +25,7 @@ export function useDocumentosFiltered(filters: {
   tipo?: string
   ano?: string
   mes?: string
+  status?: string
 }) {
   return useQuery({
     queryKey: ['documentos', 'filtered', filters],
@@ -42,6 +43,9 @@ export function useDocumentosFiltered(filters: {
       }
       if (filters.tipo && filters.tipo !== 'all') {
         query = query.eq('document_type', filters.tipo)
+      }
+      if (filters.status && filters.status !== 'all') {
+        query = query.eq('status', filters.status)
       }
 
       const { data, error } = await query
@@ -162,7 +166,7 @@ export function useCategoryBreakdown(filters?: { startDate?: string; endDate?: s
   })
 }
 
-// Trends data for line chart
+// Trends data for line chart - returns daily data, grouping is done in TrendsChart
 export function useExpenseTrends() {
   return useQuery({
     queryKey: ['dashboard', 'trends'],
@@ -175,39 +179,37 @@ export function useExpenseTrends() {
       if (error) throw error
 
       const docs = (data || []) as { doc_date: string | null; total_amount: number | null; cost_type: string | null }[]
-      
-      // Group by month for now
-      const monthlyData: Record<string, { date: string, fixos: number, variaveis: number, total: number }> = {}
-      
+
+      // Group by day (YYYY-MM-DD) - TrendsChart will handle further aggregation
+      const dailyData: Record<string, { date: string, fixos: number, variaveis: number }> = {}
+
       docs.forEach(doc => {
         if (!doc.doc_date) return
-        const date = new Date(doc.doc_date)
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-        
-        if (!monthlyData[monthKey]) {
-          monthlyData[monthKey] = { 
-            date: monthKey, 
-            fixos: 0, 
-            variaveis: 0, 
-            total: 0 
+        const dateKey = doc.doc_date // Already in YYYY-MM-DD format
+
+        if (!dailyData[dateKey]) {
+          dailyData[dateKey] = {
+            date: dateKey,
+            fixos: 0,
+            variaveis: 0
           }
         }
-        
+
         const amount = Math.abs(Number(doc.total_amount) || 0)
         if (doc.cost_type === 'custo_fixo') {
-          monthlyData[monthKey].fixos += amount
+          dailyData[dateKey].fixos += amount
         } else if (doc.cost_type === 'custo_variavel') {
-          monthlyData[monthKey].variaveis += amount
+          dailyData[dateKey].variaveis += amount
         }
-        monthlyData[monthKey].total += amount
       })
 
-      return Object.values(monthlyData).map(d => ({
-        ...d,
-        fixos: Math.round(d.fixos * 100) / 100,
-        variaveis: Math.round(d.variaveis * 100) / 100,
-        total: Math.round(d.total * 100) / 100,
-      }))
+      return Object.values(dailyData)
+        .map(d => ({
+          date: d.date,
+          fixos: Math.round(d.fixos * 100) / 100,
+          variaveis: Math.round(d.variaveis * 100) / 100,
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date))
     }
   })
 }

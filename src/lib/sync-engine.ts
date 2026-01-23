@@ -37,19 +37,31 @@ class DuplicateInvoiceError extends Error {
 async function checkDuplicateInvoice(geminiData: GeminiInvoiceData): Promise<void> {
   console.log(`🔍 Verificando duplicado: ${geminiData.supplier_name} - €${geminiData.total_amount}...`);
 
-  let query = supabase
-    .from('invoices')
-    .select('id, doc_number')
-    .eq('supplier_name', geminiData.supplier_name)
-    .eq('doc_date', geminiData.doc_date)
-    .eq('total_amount', geminiData.total_amount);
+  // Normalizar nome do fornecedor
+  geminiData.supplier_name = geminiData.supplier_name?.toUpperCase().trim() || null;
 
-  // Se tiver número de documento, adicionar à query
+  // Verificar por doc_number primeiro (identificador único)
   if (geminiData.doc_number) {
-    query = query.eq('doc_number', geminiData.doc_number);
+    const { data: docDups } = await supabase
+      .from('invoices')
+      .select('id')
+      .ilike('doc_number', geminiData.doc_number);
+
+    if (docDups && docDups.length > 0) {
+      console.warn('⚠️ Fatura DUPLICADA (doc_number)! ID:', docDups[0].id);
+      throw new DuplicateInvoiceError(
+        `Fatura duplicada: ${geminiData.supplier_name} - ${geminiData.doc_date} (${geminiData.doc_number})`
+      );
+    }
   }
 
-  const { data, error } = await query;
+  // Verificar por combinação de campos (case-insensitive)
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('id')
+    .ilike('supplier_name', geminiData.supplier_name || '')
+    .eq('doc_date', geminiData.doc_date)
+    .eq('total_amount', geminiData.total_amount);
 
   if (error) {
     console.error('Erro ao verificar duplicado:', error);
@@ -295,7 +307,7 @@ export async function syncGmailInvoices(
               cost_type: geminiData.cost_type,
               doc_date: geminiData.doc_date,
               doc_year: geminiData.doc_year,
-              supplier_name: geminiData.supplier_name,
+              supplier_name: geminiData.supplier_name?.toUpperCase().trim() || null,
               supplier_vat: geminiData.supplier_vat,
               doc_number: geminiData.doc_number,
               total_amount: geminiData.total_amount,

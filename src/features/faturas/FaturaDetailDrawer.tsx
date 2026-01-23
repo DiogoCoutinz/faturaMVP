@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { useState, useCallback } from "react";
-import { X, ExternalLink, Building2, Calendar, Hash, Tag, Pencil, Trash2, Save, XCircle, Table2 } from "lucide-react";
+import { X, ExternalLink, Building2, Calendar, Hash, Tag, Pencil, Trash2, Save, XCircle, Table2, CheckCircle } from "lucide-react";
 import type { Invoice } from "@/types/database";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,9 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
   const [isDeleting, setIsDeleting] = useState(false);
   const { user, providerToken } = useAuth();
   const queryClient = useQueryClient();
+
+  // Se a fatura está em revisão, mostrar modo de revisão expandido automaticamente
+  const isReviewMode = fatura?.status === 'review';
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-PT", {
@@ -200,6 +203,23 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
     }
   };
 
+  const handleApprove = async () => {
+    if (!fatura) return;
+    try {
+      const { error } = await (await import('@/lib/supabase/client')).supabase
+        .from('invoices')
+        .update({ status: 'processed', manual_review: false })
+        .eq('id', fatura.id);
+      if (error) throw error;
+      sonnerToast.success("Fatura aprovada!");
+      queryClient.invalidateQueries({ queryKey: ['documentos'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      onClose();
+    } catch {
+      toast({ title: "Erro", description: "Não foi possível aprovar.", variant: "destructive" });
+    }
+  };
+
   if (!fatura) return null;
 
   const pdfPreviewUrl = fatura.drive_file_id
@@ -217,6 +237,111 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
       </div>
     </div>
   );
+
+  // Modal de REVISÃO em ecrã cheio com PDF ao lado (para faturas com status review)
+  if (isReviewMode && open && !isEditing) {
+    return (
+      <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+        <DialogContent className="max-w-[95vw] w-[1400px] h-[85vh] p-0 gap-0 flex flex-col">
+          <div className="flex flex-1 min-h-0">
+            {/* ESQUERDA - PDF Preview */}
+            <div className="flex-1 bg-muted/30 border-r min-h-0">
+              {pdfPreviewUrl ? (
+                <iframe
+                  src={pdfPreviewUrl}
+                  className="w-full h-full border-0"
+                  title="PDF Preview"
+                  allow="autoplay"
+                />
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  <p>PDF não disponível</p>
+                </div>
+              )}
+            </div>
+
+            {/* DIREITA - Dados da Fatura */}
+            <div className="w-[400px] flex flex-col min-h-0">
+              <DialogHeader className="p-4 pb-3 border-b shrink-0">
+                <div className="flex items-center justify-between">
+                  <DialogTitle className="text-lg">Rever Fatura</DialogTitle>
+                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                    A Rever
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">{fatura.supplier_name}</p>
+              </DialogHeader>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+                <DetailRow icon={Building2} label="Fornecedor" value={fatura.supplier_name || "—"} />
+                {fatura.supplier_vat && <DetailRow icon={Hash} label="NIF" value={fatura.supplier_vat} />}
+                <DetailRow
+                  icon={Calendar}
+                  label="Data do Documento"
+                  value={fatura.doc_date ? format(new Date(fatura.doc_date), "dd 'de' MMMM 'de' yyyy", { locale: pt }) : "—"}
+                />
+                {fatura.doc_number && <DetailRow icon={Hash} label="Número Documento" value={fatura.doc_number} />}
+                {fatura.cost_type && <DetailRow icon={Tag} label="Categoria" value={fatura.cost_type === 'custo_fixo' ? 'Custo Fixo' : 'Custo Variável'} />}
+
+                <Separator className="my-3" />
+
+                <div className="flex items-center justify-between py-3">
+                  <span className="text-base font-medium text-muted-foreground">Total</span>
+                  <span className="text-2xl font-bold text-foreground">{formatCurrency(Number(fatura.total_amount) || 0)}</span>
+                </div>
+
+                {fatura.summary && (
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Resumo</p>
+                    <p className="text-sm">{fatura.summary}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Botões */}
+              <div className="p-4 border-t flex flex-col gap-2 shrink-0 bg-background">
+                <Button onClick={handleApprove} className="w-full gap-2 bg-green-600 hover:bg-green-700">
+                  <CheckCircle className="h-4 w-4" />
+                  Aprovar Fatura
+                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1 gap-2" onClick={handleStartEdit}>
+                    <Pencil className="h-4 w-4" />
+                    Editar
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="gap-2">
+                        <Trash2 className="h-4 w-4" />
+                        Eliminar
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Eliminar fatura?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta ação não pode ser revertida.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                          {isDeleting ? "A eliminar..." : "Eliminar"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+                <Button variant="ghost" onClick={onClose} className="w-full mt-1">
+                  Fechar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   // Modal de edição em ecrã cheio com PDF ao lado
   if (isEditing) {
@@ -447,6 +572,13 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
                 </Button>
               )}
             </div>
+
+            {fatura.status === 'review' && (
+              <Button className="w-full gap-2 bg-green-600 hover:bg-green-700" onClick={handleApprove}>
+                <CheckCircle className="h-4 w-4" />
+                Aprovar Fatura
+              </Button>
+            )}
 
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1 gap-2" onClick={handleStartEdit}>

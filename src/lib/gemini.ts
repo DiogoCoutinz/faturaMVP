@@ -51,7 +51,7 @@ Antes de tudo, verifica se a imagem/documento é realmente uma FATURA, RECIBO ou
 
 # EXTRAÇÃO DE DADOS
 - doc_date: Formato YYYY-MM-DD. Se dia/mês for ambíguo, assume padrão PT (DD-MM-AAAA).
-- supplier_name: Nome curto e limpo (ex: "Galp" em vez de "Petróleos de Portugal, S.A.").
+- supplier_name: Nome curto e limpo, SEMPRE EM MAIÚSCULAS (ex: "GALP" em vez de "Petróleos de Portugal, S.A.", "FIDELIDADE" em vez de "Fidelidade Seguros").
 - total_amount: Valor total com impostos. Usa ponto para decimais (ex: 12.50). Nunca uses vírgulas.
 - summary: Resumo telegráfico (Max 5 palavras). Ex: "Almoço cliente Braga" ou "Subscrição Canva".
 

@@ -130,15 +130,22 @@ export function TrendsChart({ data, dateFilter, onDateFilterChange }: TrendsChar
 
     try {
       switch (period) {
-        case 'day':
+        case 'day': {
+          // Dia: "15 Jan"
           const dayDate = new Date(dateStr);
           if (isNaN(dayDate.getTime())) return dateStr;
-          return new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: 'short' }).format(dayDate);
-        case 'week':
+          return new Intl.DateTimeFormat('pt-PT', { day: 'numeric', month: 'short' }).format(dayDate);
+        }
+        case 'week': {
+          // Semana: "S3 Jan" (semana 3 de janeiro)
           const weekDate = new Date(dateStr);
           if (isNaN(weekDate.getTime())) return dateStr;
-          return `Sem ${new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: 'short' }).format(weekDate)}`;
-        case 'month':
+          const weekNum = Math.ceil(weekDate.getDate() / 7);
+          const monthName = new Intl.DateTimeFormat('pt-PT', { month: 'short' }).format(weekDate);
+          return `S${weekNum} ${monthName}`;
+        }
+        case 'month': {
+          // Mês: "Jan 25"
           const parts = dateStr.split('-');
           if (parts.length < 2) return dateStr;
           const year = parseInt(parts[0]);
@@ -147,8 +154,49 @@ export function TrendsChart({ data, dateFilter, onDateFilterChange }: TrendsChar
           const monthDate = new Date(year, month - 1);
           if (isNaN(monthDate.getTime())) return dateStr;
           return new Intl.DateTimeFormat('pt-PT', { month: 'short', year: '2-digit' }).format(monthDate);
+        }
         case 'year':
+          // Ano: "2025"
           return dateStr;
+        default:
+          return dateStr;
+      }
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Formatação completa para tooltip
+  const formatDateFull = (dateStr: string) => {
+    if (!dateStr) return '';
+
+    try {
+      switch (period) {
+        case 'day': {
+          const dayDate = new Date(dateStr);
+          if (isNaN(dayDate.getTime())) return dateStr;
+          return new Intl.DateTimeFormat('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' }).format(dayDate);
+        }
+        case 'week': {
+          const weekDate = new Date(dateStr);
+          if (isNaN(weekDate.getTime())) return dateStr;
+          const weekEnd = new Date(weekDate);
+          weekEnd.setDate(weekEnd.getDate() + 6);
+          const startStr = new Intl.DateTimeFormat('pt-PT', { day: 'numeric', month: 'short' }).format(weekDate);
+          const endStr = new Intl.DateTimeFormat('pt-PT', { day: 'numeric', month: 'short' }).format(weekEnd);
+          return `Semana: ${startStr} - ${endStr}`;
+        }
+        case 'month': {
+          const parts = dateStr.split('-');
+          if (parts.length < 2) return dateStr;
+          const year = parseInt(parts[0]);
+          const month = parseInt(parts[1]);
+          if (isNaN(year) || isNaN(month)) return dateStr;
+          const monthDate = new Date(year, month - 1);
+          return new Intl.DateTimeFormat('pt-PT', { month: 'long', year: 'numeric' }).format(monthDate);
+        }
+        case 'year':
+          return `Ano ${dateStr}`;
         default:
           return dateStr;
       }
@@ -159,25 +207,43 @@ export function TrendsChart({ data, dateFilter, onDateFilterChange }: TrendsChar
 
   const hasDateFilter = startDate || endDate;
 
+  // Calcular intervalo ideal para os ticks do eixo X
+  const getTickInterval = () => {
+    const dataLength = filteredData.length;
+    if (dataLength <= 7) return 0; // Mostrar todos
+    if (dataLength <= 14) return 1; // Mostrar 1 em cada 2
+    if (dataLength <= 30) return Math.floor(dataLength / 7); // ~7 ticks
+    return Math.floor(dataLength / 6); // ~6 ticks para datasets grandes
+  };
+
   return (
-    <Card className="col-span-full lg:col-span-3 border-none shadow-card hover:shadow-card-hover transition-all duration-300">
-      <CardHeader className="flex flex-col gap-4">
+    <Card className="col-span-full lg:col-span-3 border border-border/60 shadow-sm hover:shadow-lg transition-all duration-500 hover:-translate-y-0.5 group/card bg-card/50 backdrop-blur-sm">
+      {/* Executive accent */}
+      <div className="h-1 w-full bg-gradient-to-r from-primary/0 via-primary/50 to-primary/0"></div>
+      
+      <CardHeader className="flex flex-col gap-5 pb-5 pt-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            Análise de Gastos
-          </CardTitle>
-          <div className="flex flex-wrap items-center gap-2">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-1 w-8 bg-primary rounded-full"></div>
+              <CardTitle className="text-base font-semibold text-foreground">
+                Análise de Gastos
+              </CardTitle>
+            </div>
+            <p className="text-xs text-muted-foreground ml-10">Evolução temporal dos custos</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
             <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)} className="w-[200px]">
-              <TabsList className="grid w-full grid-cols-4 h-8">
-                <TabsTrigger value="day" className="text-[10px] px-0">Dia</TabsTrigger>
-                <TabsTrigger value="week" className="text-[10px] px-0">Sem</TabsTrigger>
-                <TabsTrigger value="month" className="text-[10px] px-0">Mês</TabsTrigger>
-                <TabsTrigger value="year" className="text-[10px] px-0">Ano</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-4 h-9 bg-muted/50">
+                <TabsTrigger value="day" className="text-xs px-2 transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Dia</TabsTrigger>
+                <TabsTrigger value="week" className="text-xs px-2 transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Sem</TabsTrigger>
+                <TabsTrigger value="month" className="text-xs px-2 transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Mês</TabsTrigger>
+                <TabsTrigger value="year" className="text-xs px-2 transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Ano</TabsTrigger>
               </TabsList>
             </Tabs>
 
             <Select value={costType} onValueChange={(v) => setCostType(v as CostType)}>
-              <SelectTrigger className="w-[120px] h-8 text-xs">
+              <SelectTrigger className="w-[140px] h-9 text-sm transition-all duration-300 hover:border-primary/50 focus:border-primary">
                 <SelectValue placeholder="Tipo" />
               </SelectTrigger>
               <SelectContent>
@@ -190,45 +256,45 @@ export function TrendsChart({ data, dateFilter, onDateFilterChange }: TrendsChar
             <Button
               variant={showDateFilter ? "default" : "outline"}
               size="sm"
-              className="h-8 gap-1"
+              className="h-9 gap-1.5 transition-all duration-300 hover:scale-105"
               onClick={() => setShowDateFilter(!showDateFilter)}
             >
-              <CalendarDays className="h-3.5 w-3.5" />
-              <span className="text-xs">Datas</span>
+              <CalendarDays className="h-4 w-4 transition-transform duration-300 group-hover/card:rotate-12" />
+              <span className="text-sm">Datas</span>
             </Button>
           </div>
         </div>
 
         {/* Filtro de datas personalizado */}
         {showDateFilter && (
-          <div className="flex flex-wrap items-end gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Data Início</Label>
+          <div className="flex flex-wrap items-end gap-3 p-4 bg-muted/50 rounded-lg border border-border/50 animate-fade-in-up backdrop-blur-sm">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-foreground">Data Início</Label>
               <Input
                 type="date"
                 value={startDate}
                 onChange={(e) => handleStartDateChange(e.target.value)}
-                className="h-8 w-[140px] text-xs"
+                className="h-9 w-[150px] text-sm transition-all duration-300 hover:border-primary/50 focus:border-primary"
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Data Fim</Label>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-foreground">Data Fim</Label>
               <Input
                 type="date"
                 value={endDate}
                 onChange={(e) => handleEndDateChange(e.target.value)}
-                className="h-8 w-[140px] text-xs"
+                className="h-9 w-[150px] text-sm transition-all duration-300 hover:border-primary/50 focus:border-primary"
               />
             </div>
             {hasDateFilter && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 gap-1 text-muted-foreground hover:text-foreground"
+                className="h-9 gap-1.5 text-foreground hover:text-destructive transition-all duration-300 hover:bg-destructive/10 hover:scale-105"
                 onClick={handleClearDateFilter}
               >
-                <X className="h-3.5 w-3.5" />
-                <span className="text-xs">Limpar</span>
+                <X className="h-4 w-4 transition-transform duration-300 group-hover:rotate-90" />
+                <span className="text-sm">Limpar</span>
               </Button>
             )}
           </div>
@@ -237,8 +303,14 @@ export function TrendsChart({ data, dateFilter, onDateFilterChange }: TrendsChar
       <CardContent>
         <div className="h-[350px] w-full pt-4">
           {filteredData.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-muted-foreground">
-              Sem dados para o período selecionado
+            <div className="h-full flex flex-col items-center justify-center gap-3 text-foreground">
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
+                <CalendarDays className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <div className="text-center">
+                <p className="font-medium">Sem dados para o período selecionado</p>
+                <p className="text-sm text-muted-foreground mt-1">Tente ajustar os filtros de data</p>
+              </div>
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
@@ -261,24 +333,45 @@ export function TrendsChart({ data, dateFilter, onDateFilterChange }: TrendsChar
                   tickFormatter={formatDate}
                   tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                   dy={10}
+                  interval={getTickInterval()}
+                  minTickGap={30}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(value) => `${value}€`}
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                  tickFormatter={(value) => {
+                    if (value >= 1000) return `${(value / 1000).toFixed(1)}k€`;
+                    return `${value}€`;
+                  }}
+                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                  width={50}
                 />
                 <Tooltip
+                  isAnimationActive={false}
                   contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
                     border: '1px solid hsl(var(--border))',
-                    borderRadius: '12px',
-                    boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 12px rgb(0 0 0 / 0.1)',
+                    padding: '10px 14px',
+                    fontSize: '13px',
+                    fontWeight: '500'
                   }}
-                  formatter={(value: number) => [formatCurrency(value), '']}
-                  labelFormatter={formatDate}
+                  formatter={(value: number, name: string) => [
+                    formatCurrency(value),
+                    name === 'fixos' ? 'Custos Fixos' : 'Custos Variáveis'
+                  ]}
+                  labelFormatter={formatDateFull}
+                  cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1, strokeOpacity: 0.5 }}
                 />
-                <Legend verticalAlign="top" align="right" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', paddingBottom: '20px' }} />
+                <Legend
+                  verticalAlign="top"
+                  align="right"
+                  height={36}
+                  iconType="circle"
+                  wrapperStyle={{ fontSize: '12px', paddingBottom: '20px' }}
+                  formatter={(value) => <span style={{ color: 'hsl(var(--foreground))' }}>{value}</span>}
+                />
                 {(costType === 'all' || costType === 'fixo') && (
                   <Area
                     type="monotone"
@@ -288,7 +381,7 @@ export function TrendsChart({ data, dateFilter, onDateFilterChange }: TrendsChar
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#colorFixos)"
-                    animationDuration={1500}
+                    isAnimationActive={false}
                   />
                 )}
                 {(costType === 'all' || costType === 'variavel') && (
@@ -300,7 +393,7 @@ export function TrendsChart({ data, dateFilter, onDateFilterChange }: TrendsChar
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#colorVariaveis)"
-                    animationDuration={1500}
+                    isAnimationActive={false}
                   />
                 )}
               </AreaChart>

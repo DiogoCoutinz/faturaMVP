@@ -68,6 +68,22 @@ export function FaturasTable({ faturas, onViewDetail }: FaturasTableProps) {
     return "text-foreground";
   };
 
+  const getCategoryBadgeStyle = (costType: string | null) => {
+    if (costType === "custo_fixo") {
+      return "bg-[#0E2435]/10 text-[#0E2435] border-[#0E2435]/20";
+    }
+    if (costType === "custo_variavel") {
+      return "bg-[#BBB388]/20 text-[#8B7355] border-[#BBB388]/30";
+    }
+    return "bg-muted/20 text-muted-foreground";
+  };
+
+  const getCategoryLabel = (costType: string | null) => {
+    if (costType === "custo_fixo") return "Custo Fixo";
+    if (costType === "custo_variavel") return "Custo Variável";
+    return "Sem categoria";
+  };
+
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) return null;
     return sortOrder === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />;
@@ -126,11 +142,18 @@ export function FaturasTable({ faturas, onViewDetail }: FaturasTableProps) {
                   {fatura.doc_date ? format(new Date(fatura.doc_date), "dd/MM/yyyy", { locale: pt }) : "—"}
                 </TableCell>
                 <TableCell className="font-semibold text-foreground">
-                  {fatura.supplier_name}
+                  <div className="flex items-center gap-2">
+                    {fatura.supplier_name}
+                    {fatura.status === 'review' && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-300 bg-amber-50 text-amber-700">
+                        A rever
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  <Badge variant="outline" className="font-normal bg-muted/20">
-                    {fatura.cost_type || "Sem categoria"}
+                  <Badge variant="outline" className={`font-medium ${getCategoryBadgeStyle(fatura.cost_type)}`}>
+                    {getCategoryLabel(fatura.cost_type)}
                   </Badge>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">

@@ -9,13 +9,14 @@ import { useSearchParams } from "react-router-dom";
 import type { Invoice } from "@/types/database";
 import { useAuth } from "@/features/auth/AuthContext";
 import { Button } from "@/components/ui/button";
-import { FileArchive } from "lucide-react";
-import { exportInvoicesToZip } from "@/lib/sync/export-zip";
+import { FileArchive, FileSpreadsheet } from "lucide-react";
+import { exportInvoicesToZip, exportInvoicesToCSV } from "@/lib/sync/export-zip";
 import { toast } from "sonner";
 
 export default function Faturas() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const fornecedorFromUrl = searchParams.get("fornecedor");
+  const statusFromUrl = searchParams.get("status");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategoria, setSelectedCategoria] = useState("all");
@@ -32,6 +33,7 @@ export default function Faturas() {
     tipo: selectedTipo,
     ano: selectedAno !== "all" ? selectedAno : undefined,
     mes: selectedMes !== "all" ? selectedMes : undefined,
+    status: statusFromUrl || undefined,
   });
 
   const { data: categorias = [] } = useCategorias();
@@ -84,15 +86,29 @@ export default function Faturas() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
             {fornecedorFromUrl
               ? fornecedorFromUrl
+              : statusFromUrl === "review"
+              ? "Faturas a Rever"
               : "Faturas"
             }
           </h1>
           <p className="mt-1 text-muted-foreground">
             {fornecedorFromUrl
               ? `Faturas de ${fornecedorFromUrl}`
+              : statusFromUrl === "review"
+              ? "Faturas com baixa confiança que precisam de revisão"
               : "Consulte e gerencie todas as suas faturas"
             }
           </p>
+          {statusFromUrl && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              onClick={() => setSearchParams({})}
+            >
+              Ver todas as faturas
+            </Button>
+          )}
         </div>
 
         {/* Filters */}
@@ -120,30 +136,53 @@ export default function Faturas() {
 
         {/* Results count & Actions */}
         <div className="flex items-center justify-between animate-fade-in" style={{ animationDelay: "100ms" }}>
-          <p className="text-sm text-muted-foreground">
-            {isLoading ? "A carregar..." : `${documentos?.length || 0} ${(documentos?.length || 0) === 1 ? "resultado" : "resultados"} encontrados`}
-          </p>
+          <div className="flex items-center gap-4">
+            <p className="text-sm text-muted-foreground">
+              {isLoading ? "A carregar..." : `${documentos?.length || 0} ${(documentos?.length || 0) === 1 ? "resultado" : "resultados"} encontrados`}
+            </p>
+            {documentos && documentos.length > 0 && (
+              <p className="text-sm font-semibold text-foreground">
+                Total: {new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(
+                  documentos.reduce((sum, d) => sum + (Number(d.total_amount) || 0), 0)
+                )}
+              </p>
+            )}
+          </div>
 
           {documentos && documentos.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 border-primary/20 hover:bg-primary/5 text-primary"
-              onClick={handleExportZip}
-              disabled={isExporting}
-            >
-              {isExporting ? (
-                <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                  A exportar...
-                </>
-              ) : (
-                <>
-                  <FileArchive className="h-4 w-4" />
-                  Exportar ZIP
-                </>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-green-500/20 hover:bg-green-500/5 text-green-700"
+                onClick={() => {
+                  const csvName = `faturas_${selectedAno !== 'all' ? selectedAno : 'total'}${selectedMes !== 'all' ? '_' + selectedMes : ''}.csv`;
+                  exportInvoicesToCSV(documentos, csvName);
+                }}
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                CSV
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-primary/20 hover:bg-primary/5 text-primary"
+                onClick={handleExportZip}
+                disabled={isExporting}
+              >
+                {isExporting ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    A exportar...
+                  </>
+                ) : (
+                  <>
+                    <FileArchive className="h-4 w-4" />
+                    ZIP
+                  </>
+                )}
+              </Button>
+            </div>
           )}
         </div>
 

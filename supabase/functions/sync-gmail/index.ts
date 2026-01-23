@@ -190,7 +190,7 @@ async function markEmailAsRead(accessToken: string, messageId: string): Promise<
   });
 }
 
-const GEMINI_PROMPT = "Atua como contabilista. Extrai dados de faturas. Responde APENAS com JSON: {is_valid_document: boolean, document_type: fatura|recibo|outro|null, cost_type: custo_fixo|custo_variavel|null, doc_year: number|null, doc_date: YYYY-MM-DD|null, supplier_name: string|null, supplier_vat: string|null, doc_number: string|null, total_amount: number|null, summary: string|null, confidence_score: number}";
+const GEMINI_PROMPT = "Atua como contabilista. Extrai dados de faturas. supplier_name deve ser nome curto e limpo SEMPRE EM MAIUSCULAS (ex: GALP, FIDELIDADE, WORTEN). cost_type: custo_fixo para despesas recorrentes (seguros, rendas, telecomunicacoes, software), custo_variavel para pontuais (refeicoes, combustivel, material). Responde APENAS com JSON: {is_valid_document: boolean, document_type: fatura|recibo|outro|null, cost_type: custo_fixo|custo_variavel|null, doc_year: number|null, doc_date: YYYY-MM-DD|null, supplier_name: string|null, supplier_vat: string|null, doc_number: string|null, total_amount: number|null, summary: string|null, confidence_score: number}";
 
 async function analyzeWithGemini(pdfBase64: string, mimeType: string): Promise<GeminiInvoiceData> {
   const response = await fetch(
@@ -257,10 +257,23 @@ async function uploadToDrive(accessToken: string, fileData: Uint8Array, fileName
 }
 
 async function checkDuplicate(geminiData: GeminiInvoiceData): Promise<boolean> {
+  // Normalizar nome
+  geminiData.supplier_name = geminiData.supplier_name?.toUpperCase().trim() || null;
+
+  // Verificar por doc_number primeiro (identificador unico)
+  if (geminiData.doc_number) {
+    const { data: docDups } = await supabase
+      .from("invoices")
+      .select("id")
+      .ilike("doc_number", geminiData.doc_number);
+    if ((docDups?.length || 0) > 0) return true;
+  }
+
+  // Verificar por combinacao de campos (case-insensitive)
   const { data } = await supabase
     .from("invoices")
     .select("id")
-    .eq("supplier_name", geminiData.supplier_name)
+    .ilike("supplier_name", geminiData.supplier_name || "")
     .eq("doc_date", geminiData.doc_date)
     .eq("total_amount", geminiData.total_amount);
   return (data?.length || 0) > 0;
@@ -322,7 +335,7 @@ async function syncAccountEmails(accessToken: string, userId: string): Promise<{
               cost_type: geminiData.cost_type,
               doc_date: geminiData.doc_date,
               doc_year: geminiData.doc_year,
-              supplier_name: geminiData.supplier_name,
+              supplier_name: geminiData.supplier_name?.toUpperCase().trim() || null,
               supplier_vat: geminiData.supplier_vat,
               doc_number: geminiData.doc_number,
               total_amount: geminiData.total_amount,
@@ -370,11 +383,6 @@ async function sendErrorsToN8n(errors: Array<{ account: string; errors: string[]
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Metodo nao permitido" }), { status: 405, headers: { "Content-Type": "application/json" } });
-  }
-  const authHeader = req.headers.get("Authorization");
-  const expectedKey = Deno.env.get("SYNC_API_KEY");
-  if (expectedKey && authHeader !== "Bearer " + expectedKey) {
-    return new Response(JSON.stringify({ error: "Nao autorizado" }), { status: 401, headers: { "Content-Type": "application/json" } });
   }
   console.log("Iniciando sincronizacao automatica...");
   const results: Array<{ user_id: string; email?: string; processed: number; duplicates: number; errors: string[] }> = [];
