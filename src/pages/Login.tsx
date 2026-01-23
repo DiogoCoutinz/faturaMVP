@@ -60,13 +60,14 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="flex items-center justify-center gap-2 mb-2">
+          <div className="flex items-center justify-center gap-2 mb-1">
             <FileText className="h-8 w-8 text-primary" />
-            <span className="text-2xl font-bold">Equipa Francisco Brito</span>
+            <span className="text-2xl font-bold">FaturaAI</span>
           </div>
+          <p className="text-sm text-muted-foreground">Plataforma de automação de faturas</p>
           <CardTitle>Bem-vindo</CardTitle>
           <CardDescription>
             Faça login ou crie uma conta para continuar
@@ -153,6 +154,11 @@ export default function Login() {
           </Tabs>
         </CardContent>
       </Card>
+      <div className="mt-6 text-xs text-muted-foreground flex gap-3">
+        <a href="/privacy" className="hover:underline">Privacy Policy</a>
+        <span>·</span>
+        <a href="/terms" className="hover:underline">Terms of Service</a>
+      </div>
     </div>
   )
 }
