@@ -12,6 +12,8 @@ import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
 import Automations from "./pages/Automations";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 
 const queryClient = new QueryClient();
 
@@ -33,7 +35,10 @@ const App = () => (
           <Route path="/settings" element={<Settings />} />
           
           <Route path="/automations" element={<Automations />} />
-          
+
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </TooltipProvider>
