@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { TrendingUp, AlertCircle, Clock, Package, Receipt, ChevronRight } from "lucide-react";
 import { AppLayout } from "@/components/common/AppLayout";
 import { MetricCard } from "@/features/dashboard/MetricCard";
@@ -52,10 +52,13 @@ export default function Dashboard() {
     <AppLayout>
       <div className="space-y-12 animate-fade-in pb-8">
         {/* Header */}
-        <div className="animate-fade-in-up">
+        <div className="animate-fade-in-up flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
             Dashboard Financeiro
           </h1>
+          <span className="text-4xl font-extrabold tracking-tight text-primary">
+            FaturaAI
+          </span>
         </div>
 
         {/* Metrics Grid */}
@@ -172,6 +175,17 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-8 pb-4 text-center text-sm text-muted-foreground">
+        <Link to="/privacy" className="hover:text-primary underline transition-colors">
+          Política de Privacidade
+        </Link>
+        {" · "}
+        <Link to="/terms" className="hover:text-primary underline transition-colors">
+          Termos de Serviço
+        </Link>
       </div>
 
       <FaturaDetailDrawer
