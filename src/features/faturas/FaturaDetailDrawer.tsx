@@ -517,7 +517,7 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
               </Badge>
             )}
             {fatura.cost_type && (
-              <Badge variant="outline">{fatura.cost_type}</Badge>
+              <Badge variant="outline">{fatura.cost_type === 'custo_fixo' ? 'Custo Fixo' : 'Custo Variável'}</Badge>
             )}
           </div>
         </SheetHeader>
@@ -536,7 +536,7 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
             <DetailRow icon={Hash} label="Número do Documento" value={fatura.doc_number} />
           )}
           {fatura.cost_type && (
-            <DetailRow icon={Tag} label="Categoria" value={fatura.cost_type} />
+            <DetailRow icon={Tag} label="Categoria" value={fatura.cost_type === 'custo_fixo' ? 'Custo Fixo' : 'Custo Variável'} />
           )}
 
           <Separator className="my-4" />

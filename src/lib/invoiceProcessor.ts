@@ -12,23 +12,15 @@ export interface UploadResult {
 }
 
 /**
- * FASE 3: FLUXO COMPLETO COM ARQUITETURA HIERÁRQUICA
- * 1. Análise com Gemini Vision
- * 2. Verificar duplicados
- * 3. Criar estrutura de pastas (FATURAS/Ano/Tipo)
- * 4. Gestão dinâmica do Excel (EXTRATO_YEAR)
- * 5. Upload para Google Drive (sub-pasta correta)
- * 6. Inserir no Supabase
- * 7. Escrever no Google Sheets
+ * FLUXO COMPLETO COM ARQUITETURA HIERÁRQUICA
  */
 export async function processInvoiceUpload(
   file: File,
   userId: string | null = null,
-  accessToken: string | null = null // NOVO: Token Google necessário
+  accessToken: string | null = null
 ): Promise<UploadResult> {
   try {
-    // VALIDAÇÃO
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 10 * 1024 * 1024;
     if (file.size > maxSize) {
       return { success: false, error: 'Ficheiro demasiado grande (max 10MB)' };
     }
@@ -39,21 +31,17 @@ export async function processInvoiceUpload(
     }
 
     if (!accessToken) {
-      return { 
-        success: false, 
-        error: 'Token Google não disponível. Por favor, conecte o Google em /settings.' 
+      return {
+        success: false,
+        error: 'Token Google não disponível. Por favor, conecte o Google em /settings.'
       };
     }
 
-    // PASSO 1: ANÁLISE COM GEMINI
-    console.log('🤖 Analisando fatura com IA...');
     const base64Data = await fileToBase64(file);
     const geminiData: GeminiInvoiceData = await analyzeInvoiceWithGemini(base64Data, file.type);
 
-    // NORMALIZAR NOME DO FORNECEDOR
     geminiData.supplier_name = geminiData.supplier_name?.toUpperCase().trim() || null;
 
-    // PASSO 2: VERIFICAR DUPLICADOS (doc_number primeiro, depois combinação de campos)
     let isDuplicate = false;
 
     if (geminiData.doc_number) {
@@ -74,16 +62,7 @@ export async function processInvoiceUpload(
       if (fieldDups && fieldDups.length > 0) isDuplicate = true;
     }
 
-    const duplicates = isDuplicate ? [{ id: 'dup' }] : null;
-    const dupError = null;
-
-    if (dupError) {
-      console.error('Erro ao verificar duplicado:', dupError);
-      return { success: false, error: `Erro ao verificar duplicado: ${dupError.message}` };
-    }
-
-    if (duplicates && duplicates.length > 0) {
-      console.warn('⚠️ Fatura DUPLICADA encontrada! ID:', duplicates[0].id);
+    if (isDuplicate) {
       return {
         success: false,
         isDuplicate: true,
@@ -91,7 +70,6 @@ export async function processInvoiceUpload(
       };
     }
 
-    // PASSO 3: CRIAR ESTRUTURA DE PASTAS HIERÁRQUICA
     const year = geminiData.doc_year || new Date().getFullYear();
     const rootFolderId = await ensureFolder(accessToken, 'FATURAS');
     const yearFolderId = await ensureFolder(accessToken, year.toString(), rootFolderId);
@@ -104,22 +82,17 @@ export async function processInvoiceUpload(
     }
 
     const costTypeFolderId = await ensureFolder(accessToken, costTypeFolderName, yearFolderId);
-    console.log(`📂 Estrutura: FATURAS/${year}/${costTypeFolderName}`);
 
-    // PASSO 4: GESTÃO DINÂMICA DO EXCEL
     const spreadsheetId = await getOrCreateYearlySheet(accessToken, year, yearFolderId);
 
-    // PASSO 5: UPLOAD PARA GOOGLE DRIVE
     const pdfFileName = `${geminiData.doc_date}_${geminiData.supplier_name}_${geminiData.total_amount?.toFixed(2) || '0.00'}.pdf`
       .replace(/[/\\?%*:|"<>]/g, '_');
 
-    // Converter File para Uint8Array (com tratamento de erro)
     let uint8Array: Uint8Array;
     try {
       const arrayBuffer = await file.arrayBuffer();
       uint8Array = new Uint8Array(arrayBuffer);
-    } catch (readError) {
-      console.error('❌ Erro ao ler ficheiro:', readError);
+    } catch {
       return {
         success: false,
         error: 'Não foi possível ler o ficheiro. O ficheiro pode estar corrompido ou inacessível.'
@@ -133,18 +106,13 @@ export async function processInvoiceUpload(
       costTypeFolderId
     );
 
-    // PASSO 6: INSERIR NO SUPABASE
     const invoiceData = {
       user_id: userId,
-
-      // STORAGE (Google Drive permanente)
       file_url: driveFile.webViewLink,
-      storage_path: null, // Não usamos Supabase Storage
+      storage_path: null,
       drive_link: driveFile.webViewLink,
       drive_file_id: driveFile.id,
-      spreadsheet_id: spreadsheetId, // ID do Excel (EXTRATO_YEAR)
-      
-      // DADOS EXTRAÍDOS
+      spreadsheet_id: spreadsheetId,
       document_type: geminiData.document_type,
       cost_type: geminiData.cost_type,
       doc_date: geminiData.doc_date,
@@ -154,8 +122,6 @@ export async function processInvoiceUpload(
       doc_number: geminiData.doc_number,
       total_amount: geminiData.total_amount,
       summary: geminiData.summary,
-      
-      // STATUS
       status: geminiData.confidence_score < 70 ? 'review' : 'processed',
       manual_review: geminiData.confidence_score < 70,
     };
@@ -167,14 +133,12 @@ export async function processInvoiceUpload(
       .single();
 
     if (insertError) {
-      console.error('❌ Erro ao inserir no DB:', insertError);
-      return { 
-        success: false, 
-        error: `Erro ao guardar dados: ${insertError.message}` 
+      return {
+        success: false,
+        error: `Erro ao guardar dados: ${insertError.message}`
       };
     }
 
-    // PASSO 7: ESCREVER NO GOOGLE SHEETS
     try {
       await appendInvoiceToSheet(accessToken, spreadsheetId, {
         doc_date: geminiData.doc_date,
@@ -187,22 +151,19 @@ export async function processInvoiceUpload(
         summary: geminiData.summary,
         drive_link: driveFile.webViewLink,
       });
-    } catch (sheetsError) {
-      console.warn('⚠️ Erro ao escrever no Sheets:', sheetsError);
+    } catch {
+      // Continue without Sheets
     }
 
-    console.log(`✅ Fatura processada: ${geminiData.supplier_name} - ${geminiData.total_amount}€`);
-    
-    return { 
-      success: true, 
-      invoice: invoice as Invoice 
+    return {
+      success: true,
+      invoice: invoice as Invoice
     };
 
   } catch (error) {
-    console.error('Erro no processamento:', error);
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Erro desconhecido' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Erro desconhecido'
     };
   }
 }

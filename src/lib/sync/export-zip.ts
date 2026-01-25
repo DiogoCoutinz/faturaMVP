@@ -97,8 +97,7 @@ export async function exportInvoicesToZip(
 
         folder?.file(fileName, blob);
         successCount++;
-      } catch (error) {
-        console.error(`Erro ao descarregar fatura ${invoice.drive_file_id}:`, error);
+      } catch {
         failCount++;
       }
     }));

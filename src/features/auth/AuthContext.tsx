@@ -47,15 +47,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
-      
-      // Extrair provider_token se existir
+
       if (session?.provider_token) {
         setProviderToken(session.provider_token)
-        console.log('✅ Provider Token disponível:', session.provider_token.substring(0, 20) + '...')
-      } else if (session?.user) {
-        console.warn('⚠️ Sessão ativa mas sem provider_token. Reconecta com Google.')
       }
-      
+
       setLoading(false)
     })
 
@@ -96,13 +92,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
 
       if (error) {
-        console.error('❌ Erro no login Google:', error)
         throw error
       }
-      
-      console.log('🔐 Redirecionando para Google OAuth...')
     } catch (error) {
-      console.error('Erro ao iniciar login:', error)
       throw error
     }
   }

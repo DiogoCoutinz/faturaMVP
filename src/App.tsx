@@ -10,7 +10,6 @@ import Faturas from "./pages/Faturas";
 import Upload from "./pages/Upload";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
-import Settings from "./pages/Settings";
 import Automations from "./pages/Automations";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
@@ -31,9 +30,7 @@ const App = () => (
           <Route path="/faturas" element={<Faturas />} />
           
           <Route path="/upload" element={<Upload />} />
-          
-          <Route path="/settings" element={<Settings />} />
-          
+
           <Route path="/automations" element={<Automations />} />
 
           <Route path="/privacy" element={<Privacy />} />

@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 
 if (!GEMINI_API_KEY) {
-  console.warn('⚠️ VITE_GEMINI_API_KEY não configurada no .env');
+  throw new Error('VITE_GEMINI_API_KEY não configurada no .env');
 }
 
 // Lazy initialization - só cria quando API key existir
@@ -150,10 +150,9 @@ export async function analyzeInvoiceWithGemini(
 
     return data;
   } catch (error) {
-    console.error('Erro ao analisar com Gemini:', error);
     throw new Error(
-      error instanceof Error 
-        ? `Falha na análise: ${error.message}` 
+      error instanceof Error
+        ? `Falha na análise: ${error.message}`
         : 'Erro desconhecido ao processar documento'
     );
   }

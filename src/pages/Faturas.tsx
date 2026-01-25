@@ -62,8 +62,7 @@ export default function Faturas() {
     try {
       const zipName = `faturas_${selectedAno !== 'all' ? selectedAno : 'total'}${selectedMes !== 'all' ? '_' + selectedMes : ''}.zip`;
       await exportInvoicesToZip(documentos, providerToken, zipName);
-    } catch (err) {
-      console.error("Erro na exportação:", err);
+    } catch {
       toast.error("Ocorreu um erro ao gerar o ficheiro ZIP");
     } finally {
       setIsExporting(false);

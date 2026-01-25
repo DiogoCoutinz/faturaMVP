@@ -1,9 +1,8 @@
 import { NavLink, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  FileText, 
-  Upload, 
-  Settings,
+import {
+  LayoutDashboard,
+  FileText,
+  Upload,
   Bot,
   Building2,
   ChevronLeft,
@@ -18,7 +17,6 @@ const navigation = [
   { name: "Faturas", href: "/faturas", icon: FileText },
   { name: "Upload", href: "/upload", icon: Upload },
   { name: "Automações", href: "/automations", icon: Bot },
-  { name: "Definições", href: "/settings", icon: Settings },
 ];
 
 interface FornecedorStats {

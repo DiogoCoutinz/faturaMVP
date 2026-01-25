@@ -1,10 +1,8 @@
 /**
  * GOOGLE SHEETS REST API (Browser-Compatible)
  * Usa fetch direto para escrever em Sheets
- * Docs: https://developers.google.com/sheets/api/reference/rest
  */
 
-// Mapeamento de mês para nome de aba
 export const MONTH_SHEET_NAMES = [
   '01_Janeiro',
   '02_Fevereiro',
@@ -21,8 +19,7 @@ export const MONTH_SHEET_NAMES = [
 ];
 
 /**
- * FASE 2B: Escreve uma fatura no Google Sheets
- * Formato: [Data, Fornecedor, NIF, Tipo, Nº Doc, Valor, IVA, Resumo, Link, Data Processamento]
+ * Escreve uma fatura no Google Sheets
  */
 export async function appendInvoiceToSheet(
   accessToken: string,
@@ -39,75 +36,61 @@ export async function appendInvoiceToSheet(
     drive_link: string | null;
   }
 ): Promise<void> {
-  try {
-    // Determinar a aba (mês) com base na doc_date
-    let sheetName = MONTH_SHEET_NAMES[0]; // Fallback: 01_Janeiro
+  let sheetName = MONTH_SHEET_NAMES[0];
 
-    if (invoiceData.doc_date) {
-      try {
-        const date = new Date(invoiceData.doc_date);
-        if (!isNaN(date.getTime())) {
-          const month = date.getMonth(); // 0-11
-          if (month >= 0 && month < 12) {
-            sheetName = MONTH_SHEET_NAMES[month];
-          }
+  if (invoiceData.doc_date) {
+    try {
+      const date = new Date(invoiceData.doc_date);
+      if (!isNaN(date.getTime())) {
+        const month = date.getMonth();
+        if (month >= 0 && month < 12) {
+          sheetName = MONTH_SHEET_NAMES[month];
         }
-      } catch {
-        // Usar fallback se data inválida
       }
+    } catch {
+      // Usar fallback
     }
+  }
 
-    console.log(`📊 Escrevendo no Google Sheets (aba: ${sheetName})...`);
+  await ensureSheetHasHeader(accessToken, spreadsheetId, sheetName);
 
-    // Garantir que a aba tem cabeçalho antes de adicionar dados
-    await ensureSheetHasHeader(accessToken, spreadsheetId, sheetName);
+  const row = [
+    invoiceData.doc_date || '',
+    invoiceData.supplier_name || '',
+    invoiceData.supplier_vat || '',
+    invoiceData.cost_type || '',
+    invoiceData.doc_number || '',
+    invoiceData.total_amount || 0,
+    invoiceData.tax_amount || 0,
+    invoiceData.summary || '',
+    invoiceData.drive_link || '',
+    new Date().toISOString().split('T')[0],
+  ];
 
-    // Preparar linha de dados (ordem estrita)
-    const row = [
-      invoiceData.doc_date || '',                     // [A] Data
-      invoiceData.supplier_name || '',                // [B] Fornecedor
-      invoiceData.supplier_vat || '',                 // [C] NIF
-      invoiceData.cost_type || '',                    // [D] Tipo Custo
-      invoiceData.doc_number || '',                   // [E] Nº Doc
-      invoiceData.total_amount || 0,                  // [F] Valor
-      invoiceData.tax_amount || 0,                    // [G] IVA
-      invoiceData.summary || '',                      // [H] Resumo
-      invoiceData.drive_link || '',                   // [I] Link PDF
-      new Date().toISOString().split('T')[0],         // [J] Data Processamento (hoje)
-    ];
+  const range = `${sheetName}!A2:J`;
 
-    // Range: Adiciona a partir da linha 2 (linha 1 é o cabeçalho)
-    const range = `${sheetName}!A2:J`;
-
-    const response = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          values: [row],
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Erro ao escrever no Sheets: ${response.status} - ${error}`);
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        values: [row],
+      }),
     }
+  );
 
-    const result = await response.json();
-    console.log(`✅ Linha adicionada ao Sheets: ${result.updates?.updatedRange}`);
-  } catch (error) {
-    console.error('❌ Erro ao escrever no Google Sheets:', error);
-    throw error;
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Erro ao escrever no Sheets: ${response.status} - ${error}`);
   }
 }
 
 /**
- * Escreve uma linha numa folha de cálculo (append genérico)
+ * Escreve uma linha numa folha de cálculo
  */
 export async function appendRowToSheet(
   accessToken: string,
@@ -133,8 +116,6 @@ export async function appendRowToSheet(
     const error = await response.text();
     throw new Error(`Erro ao escrever no Sheets: ${response.status} - ${error}`);
   }
-
-  console.log('✅ Linha adicionada ao Google Sheets');
 }
 
 /**
@@ -164,12 +145,10 @@ export async function appendMultipleRows(
     const error = await response.text();
     throw new Error(`Erro ao escrever múltiplas linhas: ${response.status} - ${error}`);
   }
-
-  console.log(`✅ ${rows.length} linhas adicionadas ao Google Sheets`);
 }
 
 /**
- * Helper: Converte Invoice para row do Google Sheets
+ * Converte Invoice para row do Google Sheets
  */
 export function invoiceToSheetRow(invoice: {
   doc_date: string | null;
@@ -192,16 +171,13 @@ export function invoiceToSheetRow(invoice: {
 }
 
 /**
- * FASE 3: Lê a estrutura do Template (cabeçalhos) para replicar
+ * Lê a estrutura do Template
  */
 export async function getTemplateStructure(
   accessToken: string,
   templateId: string
 ): Promise<{ headers: string[]; sheets: string[] } | null> {
-  console.log('📖 Lendo estrutura do Template...');
-  
   try {
-    // Ler as abas do Template
     const metadataResponse = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${templateId}?fields=sheets.properties`,
       {
@@ -210,14 +186,12 @@ export async function getTemplateStructure(
     );
 
     if (!metadataResponse.ok) {
-      console.warn('   ⚠️ Template não acessível para leitura');
       return null;
     }
 
     const metadata = await metadataResponse.json();
     const sheets = metadata.sheets.map((s: any) => s.properties.title);
 
-    // Ler os cabeçalhos da primeira aba
     const headersResponse = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${templateId}/values/${sheets[0]}!A1:K1`,
       {
@@ -228,20 +202,17 @@ export async function getTemplateStructure(
     if (headersResponse.ok) {
       const headersData = await headersResponse.json();
       const headers = headersData.values?.[0] || [];
-      console.log(`   ✅ Template lido: ${sheets.length} abas, ${headers.length} colunas`);
       return { headers, sheets };
     }
 
     return null;
-  } catch (error) {
-    console.warn('   ⚠️ Erro ao ler Template:', error);
+  } catch {
     return null;
   }
 }
 
 /**
  * Verifica se uma aba tem cabeçalho e adiciona se não tiver
- * Cria a aba se não existir
  */
 export async function ensureSheetHasHeader(
   accessToken: string,
@@ -255,23 +226,19 @@ export async function ensureSheetHasHeader(
   ];
 
   try {
-    // Primeiro verificar se a aba existe
     const metaResponse = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
 
     if (!metaResponse.ok) {
-      console.warn(`⚠️ Não foi possível verificar spreadsheet ${spreadsheetId}`);
       return;
     }
 
     const metaData = await metaResponse.json();
     const sheetExists = metaData.sheets?.some((s: { properties: { title: string } }) => s.properties.title === sheetName);
 
-    // Se a aba não existe, criar
     if (!sheetExists) {
-      console.log(`📝 Criando aba ${sheetName}...`);
       const createResponse = await fetch(
         `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
         {
@@ -291,14 +258,10 @@ export async function ensureSheetHasHeader(
       );
 
       if (!createResponse.ok) {
-        const error = await createResponse.text();
-        console.error(`❌ Erro ao criar aba ${sheetName}: ${error}`);
         return;
       }
-      console.log(`   ✅ Aba ${sheetName} criada`);
     }
 
-    // Verificar se a linha 1 tem conteúdo
     const checkResponse = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/'${sheetName}'!A1:J1`,
       {
@@ -307,30 +270,24 @@ export async function ensureSheetHasHeader(
     );
 
     if (!checkResponse.ok) {
-      console.warn(`⚠️ Não foi possível verificar cabeçalho na aba ${sheetName}`);
       return;
     }
 
     const checkData = await checkResponse.json();
     const existingRow = checkData.values?.[0] || [];
 
-    // Se a linha 1 está vazia ou o primeiro valor não é "Data Doc.", adicionar cabeçalho
     if (existingRow.length === 0 || existingRow[0] !== 'Data Doc.') {
-      console.log(`📝 Adicionando cabeçalho à aba ${sheetName}...`);
-
-      // Obter o sheetId numérico
-      const metaResponse = await fetch(
+      const metaResponse2 = await fetch(
         `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
-      const metaData = await metaResponse.json();
-      const sheet = metaData.sheets?.find((s: any) => s.properties.title === sheetName);
+      const metaData2 = await metaResponse2.json();
+      const sheet = metaData2.sheets?.find((s: any) => s.properties.title === sheetName);
 
       if (!sheet) return;
 
       const sheetId = sheet.properties.sheetId;
 
-      // Se já tem dados na linha 1, inserir nova linha no topo
       if (existingRow.length > 0) {
         await fetch(
           `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
@@ -357,7 +314,6 @@ export async function ensureSheetHasHeader(
         );
       }
 
-      // Escrever cabeçalho com formatação azul
       await fetch(
         `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
         {
@@ -380,7 +336,7 @@ export async function ensureSheetHasHeader(
                   values: HEADERS.map(header => ({
                     userEnteredValue: { stringValue: header },
                     userEnteredFormat: {
-                      backgroundColor: { red: 0.71, green: 0.82, blue: 0.93 }, // Azul claro
+                      backgroundColor: { red: 0.71, green: 0.82, blue: 0.93 },
                       textFormat: { bold: true, fontSize: 10 },
                       horizontalAlignment: 'CENTER',
                       verticalAlignment: 'MIDDLE'
@@ -401,26 +357,21 @@ export async function ensureSheetHasHeader(
           }),
         }
       );
-
-      console.log(`   ✅ Cabeçalho adicionado à aba ${sheetName}`);
     }
-  } catch (error) {
-    console.warn(`⚠️ Erro ao verificar/adicionar cabeçalho:`, error);
+  } catch {
+    // Silently fail
   }
 }
 
 /**
- * FASE 3: Escreve os cabeçalhos e aplica formatação profissional em todas as abas
+ * Escreve os cabeçalhos e aplica formatação em todas as abas
  */
 export async function setupSpreadsheetHeaders(
   accessToken: string,
   spreadsheetId: string,
   headers: string[]
 ): Promise<void> {
-  console.log('📝 Configurando cabeçalhos e formatação em todas as abas...');
-
   try {
-    // 1. Obter os sheetIds para poder aplicar formatação (que exige ID numérico)
     const metadataResponse = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets.properties`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -432,9 +383,7 @@ export async function setupSpreadsheetHeaders(
 
     sheets.forEach((sheet: any) => {
       const sheetId = sheet.properties.sheetId;
-      const sheetName = sheet.properties.title;
 
-      // Request 1: Definir valores do cabeçalho
       requests.push({
         updateCells: {
           range: {
@@ -448,7 +397,7 @@ export async function setupSpreadsheetHeaders(
             values: headers.map(header => ({
               userEnteredValue: { stringValue: header },
               userEnteredFormat: {
-                backgroundColor: { red: 0.71, green: 0.82, blue: 0.93 }, // Azul suave
+                backgroundColor: { red: 0.71, green: 0.82, blue: 0.93 },
                 textFormat: { bold: true, fontSize: 10 },
                 horizontalAlignment: 'CENTER',
                 verticalAlignment: 'MIDDLE'
@@ -459,7 +408,6 @@ export async function setupSpreadsheetHeaders(
         }
       });
 
-      // Request 2: Congelar a primeira linha
       requests.push({
         updateSheetProperties: {
           properties: {
@@ -470,7 +418,6 @@ export async function setupSpreadsheetHeaders(
         }
       });
 
-      // Request 3: Ajustar largura das colunas (formato correto: startIndex/endIndex)
       requests.push({
         updateDimensionProperties: {
           range: {
@@ -483,13 +430,12 @@ export async function setupSpreadsheetHeaders(
           fields: 'pixelSize'
         }
       });
-      
-      // Ajustes específicos de largura
+
       const columnWidths = [
-        { idx: 0, size: 90 },  // Data
-        { idx: 1, size: 200 }, // Fornecedor
-        { idx: 7, size: 250 }, // Resumo
-        { idx: 8, size: 300 }, // Link PDF
+        { idx: 0, size: 90 },
+        { idx: 1, size: 200 },
+        { idx: 7, size: 250 },
+        { idx: 8, size: 300 },
       ];
 
       columnWidths.forEach(w => {
@@ -508,8 +454,7 @@ export async function setupSpreadsheetHeaders(
       });
     });
 
-    // Enviar todos os requests num único batch
-    const response = await fetch(
+    await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
       {
         method: 'POST',
@@ -520,14 +465,7 @@ export async function setupSpreadsheetHeaders(
         body: JSON.stringify({ requests }),
       }
     );
-
-    if (response.ok) {
-      console.log('   ✅ Cabeçalhos e formatação aplicados com sucesso!');
-    } else {
-      const errText = await response.text();
-      console.warn('   ⚠️ Erro ao aplicar formatação:', errText);
-    }
-  } catch (error) {
-    console.error('   ❌ Erro catastrófico ao configurar Sheet:', error);
+  } catch {
+    // Silently fail
   }
 }

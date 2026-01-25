@@ -77,13 +77,7 @@ export function EditInvoiceDrawer({
   };
 
   const handleSave = async () => {
-    console.log('🔵 ========== INÍCIO handleSave ==========');
-    console.log('🔵 Invoice ID:', invoice?.id);
-    console.log('🔵 User:', user?.id);
-    console.log('🔵 Provider Token disponível:', !!providerToken);
-    
     if (!invoice || !user || !providerToken) {
-      console.error('❌ Dados de autenticação inválidos');
       toast.error('Dados de autenticação inválidos');
       return;
     }
@@ -96,7 +90,6 @@ export function EditInvoiceDrawer({
 
     // Se já está a atualizar, ignorar nova chamada
     if (isUpdating) {
-      console.warn('⚠️ Já está a atualizar, ignorando nova chamada');
       toast.info('Aguarde a atualização anterior terminar');
       return;
     }
@@ -125,7 +118,7 @@ export function EditInvoiceDrawer({
       validationErrors.push('IVA deve ser um número válido');
     }
 
-    // Validar valores negativos (opcional - pode ser aceite dependendo das regras de negócio)
+    // Validar valores negativos
     if (totalAmount && parseFloat(totalAmount) < 0) {
       validationErrors.push('Valor total não pode ser negativo');
     }
@@ -150,29 +143,18 @@ export function EditInvoiceDrawer({
     setIsUpdating(true);
     setUpdateResult(null);
 
-    console.log('🔵 Validação passou, começando detecção de mudanças...');
-
     try {
       // Detectar mudanças
       const updates: Record<string, unknown> = {};
 
-      console.log('🔵 Comparando valores:');
-      console.log('   supplierName:', supplierName, 'vs', invoice.supplier_name);
-      console.log('   costType:', costType, 'vs', invoice.cost_type);
-      console.log('   docDate:', docDate, 'vs', invoice.doc_date);
-      console.log('   totalAmount:', totalAmount, 'vs', invoice.total_amount);
-
       if (supplierName !== invoice.supplier_name) {
         updates.supplier_name = supplierName.trim();
-        console.log('   ✅ supplier_name mudou');
       }
       if (supplierVat !== invoice.supplier_vat) {
         updates.supplier_vat = supplierVat.trim();
-        console.log('   ✅ supplier_vat mudou');
       }
       if (docNumber !== invoice.doc_number) {
         updates.doc_number = docNumber.trim();
-        console.log('   ✅ doc_number mudou');
       }
       if (docDate !== invoice.doc_date) {
         updates.doc_date = docDate;
@@ -180,45 +162,31 @@ export function EditInvoiceDrawer({
         if (!isNaN(newYear)) {
           updates.doc_year = newYear;
         }
-        console.log('   ✅ doc_date mudou');
       }
       if (totalAmount !== invoice.total_amount?.toString()) {
         const parsedAmount = parseFloat(totalAmount);
         if (!isNaN(parsedAmount)) {
           updates.total_amount = parsedAmount;
         }
-        console.log('   ✅ total_amount mudou');
       }
       if (taxAmount !== invoice.tax_amount?.toString()) {
         const parsedTax = parseFloat(taxAmount);
         if (!isNaN(parsedTax)) {
           updates.tax_amount = parsedTax;
         }
-        console.log('   ✅ tax_amount mudou');
       }
       if (summary !== invoice.summary) {
         updates.summary = summary.trim();
-        console.log('   ✅ summary mudou');
       }
       if (costType !== invoice.cost_type) {
         updates.cost_type = costType;
-        console.log('   ✅ cost_type mudou:', invoice.cost_type, '→', costType);
       }
 
-      console.log('🔵 Total de campos alterados:', Object.keys(updates).length);
-      console.log('🔵 Updates:', JSON.stringify(updates, null, 2));
-
       if (Object.keys(updates).length === 0) {
-        console.warn('⚠️ Nenhuma alteração detectada');
         toast.info('Nenhuma alteração detectada');
         setIsUpdating(false);
         return;
       }
-
-      console.log('🔵 Chamando updateInvoiceEverywhere...');
-      console.log('   invoiceId:', invoice.id);
-      console.log('   userId:', user.id);
-      console.log('   updates:', updates);
 
       const result = await updateInvoiceEverywhere({
         invoiceId: invoice.id,
@@ -227,26 +195,16 @@ export function EditInvoiceDrawer({
         updates,
       });
 
-      console.log('🔵 Resultado recebido:', JSON.stringify(result, null, 2));
-
-      console.log('🔵 Processando resultado...');
-      console.log('   success:', result.success);
-      console.log('   updatedInSupabase:', result.updatedInSupabase);
-      console.log('   updatedInSheets:', result.updatedInSheets);
-      console.log('   fileMoved:', result.fileMoved);
-
       if (result.success) {
         const movedText = result.fileMoved ? ' (ficheiro movido no Drive!)' : '';
 
         if (result.updatedInSheets) {
-          console.log('✅ SUCESSO COMPLETO - Supabase e Sheets atualizados!');
           setUpdateResult({
             type: 'success',
             message: `Fatura atualizada no sistema e no Google Sheets!${movedText}`,
           });
           toast.success(`Fatura atualizada com sucesso!${movedText}`);
         } else {
-          console.warn('⚠️ SUCESSO PARCIAL - Supabase atualizado mas Sheets não');
           setUpdateResult({
             type: 'warning',
             message: `Atualizado no sistema${movedText}, mas não foi possível sincronizar com o Excel`,
@@ -257,13 +215,9 @@ export function EditInvoiceDrawer({
         onSuccess?.();
 
         setTimeout(() => {
-          console.log('🔵 Fechando drawer...');
           onOpenChange(false);
         }, 2000);
       } else {
-        console.error('❌ FALHA - Resultado não foi bem-sucedido');
-        console.error('   Mensagem:', result.message);
-        console.error('   Erro:', result.error);
         setUpdateResult({
           type: 'error',
           message: result.message,
@@ -271,17 +225,12 @@ export function EditInvoiceDrawer({
         toast.error(result.message);
       }
     } catch (error) {
-      console.error('❌ ERRO CAPTURADO no handleSave:', error);
-      console.error('   Tipo:', error instanceof Error ? error.constructor.name : typeof error);
-      console.error('   Mensagem:', error instanceof Error ? error.message : String(error));
-      console.error('   Stack:', error instanceof Error ? error.stack : 'N/A');
       setUpdateResult({
         type: 'error',
         message: `Erro ao processar atualização: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
       });
       toast.error('Erro ao atualizar fatura');
     } finally {
-      console.log('🔵 ========== FIM handleSave ==========');
       setIsUpdating(false);
       saveTimeoutRef.current = null;
     }
