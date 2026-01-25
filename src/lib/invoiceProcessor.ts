@@ -33,7 +33,7 @@ export async function processInvoiceUpload(
     if (!accessToken) {
       return {
         success: false,
-        error: 'Token Google não disponível. Por favor, conecte o Google em /settings.'
+        error: 'Por favor, adicione uma conta Google em Automações primeiro.'
       };
     }
 

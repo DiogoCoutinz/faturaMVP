@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Plus,
   Trash2,
+  Star,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -35,6 +36,7 @@ interface ConnectedAccount {
   id: string;
   email: string;
   token_expiry: string;
+  is_primary_storage: boolean;
 }
 
 const GOOGLE_SCOPES = [
@@ -54,7 +56,7 @@ export default function AutomationsPage() {
     setLoading(true);
 
     const [accountsRes, logsRes] = await Promise.all([
-      supabase.from('user_oauth_tokens').select('id, email, token_expiry').eq('provider', 'google'),
+      supabase.from('user_oauth_tokens').select('id, email, token_expiry, is_primary_storage').eq('provider', 'google'),
       supabase.from('sync_logs').select('*').order('started_at', { ascending: false }).limit(5),
     ]);
 
@@ -163,6 +165,20 @@ export default function AutomationsPage() {
     }
   };
 
+  const handleSetPrimaryStorage = async (accountId: string, email: string) => {
+    const { error } = await supabase
+      .from('user_oauth_tokens')
+      .update({ is_primary_storage: true })
+      .eq('id', accountId);
+
+    if (error) {
+      toast.error('Erro ao definir conta principal');
+    } else {
+      toast.success(`${email} definida como conta de armazenamento`);
+      fetchData();
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'success':
@@ -207,7 +223,7 @@ export default function AutomationsPage() {
                   Contas Conectadas
                 </CardTitle>
                 <CardDescription>
-                  Contas Gmail que serão verificadas automaticamente
+                  Contas Gmail que serão verificadas. A conta com <Star className="h-3 w-3 inline" /> guarda os ficheiros no Drive/Sheets.
                 </CardDescription>
               </div>
               <Button onClick={handleAddAccount} disabled={addingAccount} className="gap-2">
@@ -230,27 +246,56 @@ export default function AutomationsPage() {
                 {accounts.map((acc) => (
                   <div
                     key={acc.id}
-                    className="flex items-center justify-between p-3 rounded-lg border bg-background"
+                    className={`flex items-center justify-between p-3 rounded-lg border ${
+                      acc.is_primary_storage
+                        ? 'bg-primary/5 border-primary/30'
+                        : 'bg-background'
+                    }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                        acc.is_primary_storage
+                          ? 'bg-primary/20'
+                          : 'bg-primary/10'
+                      }`}>
                         <Mail className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <p className="font-medium">{acc.email}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{acc.email}</p>
+                          {acc.is_primary_storage && (
+                            <Badge className="bg-primary/20 text-primary border-primary/30 gap-1">
+                              <Star className="h-3 w-3" />
+                              Armazenamento
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           Token expira: {new Date(acc.token_expiry).toLocaleString('pt-PT')}
                         </p>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => handleRemoveAccount(acc.id, acc.email)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {!acc.is_primary_storage && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-primary"
+                          onClick={() => handleSetPrimaryStorage(acc.id, acc.email)}
+                          title="Definir como conta de armazenamento"
+                        >
+                          <Star className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleRemoveAccount(acc.id, acc.email)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

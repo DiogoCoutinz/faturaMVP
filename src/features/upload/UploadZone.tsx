@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { processInvoiceUpload } from '@/lib/invoiceProcessor';
 import { useAuth } from '@/features/auth/AuthContext';
+import { supabase } from '@/lib/supabase/client';
 import type { Invoice } from '@/types/database';
 
 interface FileUploadStatus {
@@ -18,12 +19,28 @@ interface FileUploadStatus {
 const MAX_FILES = 10;
 
 export function UploadZone() {
-  const { user, providerToken, hasGoogleScopes } = useAuth();
+  const { user } = useAuth();
   const [fileStatuses, setFileStatuses] = useState<FileUploadStatus[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [storageToken, setStorageToken] = useState<string | null>(null);
   const abortRef = useRef(false);
   const processingRef = useRef(false);
+
+  // Fetch primary storage account token
+  useEffect(() => {
+    const fetchStorageToken = async () => {
+      const { data } = await supabase
+        .from('user_oauth_tokens')
+        .select('access_token')
+        .eq('provider', 'google')
+        .eq('is_primary_storage', true)
+        .single();
+
+      setStorageToken(data?.access_token || null);
+    };
+    fetchStorageToken();
+  }, []);
 
   // Processar ficheiros em fila
   useEffect(() => {
@@ -50,7 +67,7 @@ export function UploadZone() {
         ));
 
         try {
-          const result = await processInvoiceUpload(statuses[i].file, user?.id || null, providerToken!);
+          const result = await processInvoiceUpload(statuses[i].file, user?.id || null, storageToken);
 
           if (result.success && result.invoice) {
             setFileStatuses(prev => prev.map((f, idx) =>
@@ -79,16 +96,16 @@ export function UploadZone() {
     };
 
     processQueue(fileStatuses);
-  }, [isProcessing]);
+  }, [isProcessing, storageToken, user?.id]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
 
-    if (!providerToken || !hasGoogleScopes) {
+    if (!storageToken) {
       setFileStatuses([{
         file: acceptedFiles[0],
         status: 'error',
-        message: 'Por favor, conecte o Google em /settings antes de fazer upload.',
+        message: 'Por favor, adicione uma conta Google em Automações primeiro.',
       }]);
       return;
     }
@@ -105,7 +122,7 @@ export function UploadZone() {
     setFileStatuses(newStatuses);
     abortRef.current = false;
     setIsProcessing(true);
-  }, [providerToken, hasGoogleScopes]);
+  }, [storageToken]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
