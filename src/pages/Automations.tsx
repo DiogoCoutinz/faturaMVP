@@ -17,6 +17,8 @@ import {
   Plus,
   Trash2,
   Star,
+  AlertCircle,
+  LogIn,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -70,77 +72,22 @@ export default function AutomationsPage() {
   useEffect(() => {
     fetchData();
 
-    // Verificar se voltámos do OAuth
-    const handleOAuthCallback = async () => {
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      const refreshToken = hashParams.get('refresh_token');
+    // Verificar se voltámos do OAuth (nova versão com query params)
+    const handleOAuthCallback = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const oauthStatus = urlParams.get('oauth');
+      const email = urlParams.get('email');
+      const errorMessage = urlParams.get('message');
 
-      if (accessToken) {
+      if (oauthStatus) {
         // Limpar URL
         window.history.replaceState({}, document.title, window.location.pathname);
 
-        try {
-          // Obter informações do utilizador do Google
-          const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          });
-
-          if (!userInfoRes.ok) {
-            throw new Error(`Erro ao obter info do utilizador: ${userInfoRes.status}`);
-          }
-
-          const userInfo = await userInfoRes.json();
-
-          if (!userInfo.email) {
-            throw new Error('Email não disponível na resposta do Google');
-          }
-
-          // Verificar se já existe
-          const { data: existing } = await supabase
-            .from('user_oauth_tokens')
-            .select('id')
-            .eq('email', userInfo.email)
-            .single();
-
-          if (existing) {
-            // Atualizar tokens existentes
-            await supabase
-              .from('user_oauth_tokens')
-              .update({
-                access_token: accessToken,
-                refresh_token: refreshToken || undefined,
-                token_expiry: new Date(Date.now() + 3600 * 1000).toISOString(),
-              })
-              .eq('id', existing.id);
-            toast.success(`Conta ${userInfo.email} atualizada!`);
-          } else {
-            // Criar novo registo
-            const { data: { user } } = await supabase.auth.getUser();
-
-            // Verificar se é a primeira conta (definir como primary)
-            const { count } = await supabase
-              .from('user_oauth_tokens')
-              .select('*', { count: 'exact', head: true })
-              .eq('provider', 'google');
-
-            await supabase.from('user_oauth_tokens').insert({
-              user_id: user?.id || null,
-              provider: 'google',
-              email: userInfo.email,
-              access_token: accessToken,
-              refresh_token: refreshToken || '',
-              token_expiry: new Date(Date.now() + 3600 * 1000).toISOString(),
-              scopes: GOOGLE_SCOPES.split(' '),
-              is_primary_storage: count === 0, // Primeira conta é primary
-            });
-            toast.success(`Conta ${userInfo.email} adicionada!`);
-          }
-
+        if (oauthStatus === 'success' && email) {
+          toast.success(`Conta ${email} conectada com sucesso!`);
           fetchData();
-        } catch (err) {
-          console.error('OAuth callback error:', err);
-          toast.error(err instanceof Error ? err.message : 'Erro ao guardar conta');
+        } else if (oauthStatus === 'error') {
+          toast.error(errorMessage || 'Erro ao conectar conta');
         }
       }
     };
@@ -152,19 +99,30 @@ export default function AutomationsPage() {
     setAddingAccount(true);
 
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
     if (!clientId) {
       toast.error('Google Client ID não configurado');
       setAddingAccount(false);
       return;
     }
 
-    const redirectUri = window.location.origin + '/automations';
+    if (!supabaseUrl) {
+      toast.error('Supabase URL não configurado');
+      setAddingAccount(false);
+      return;
+    }
+
+    // Novo fluxo: Authorization Code com refresh tokens
+    // O redirect vai para a Edge Function que troca o code por tokens
+    const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     authUrl.searchParams.set('client_id', clientId);
     authUrl.searchParams.set('redirect_uri', redirectUri);
-    authUrl.searchParams.set('response_type', 'token');
+    authUrl.searchParams.set('response_type', 'code'); // CODE em vez de token
     authUrl.searchParams.set('scope', GOOGLE_SCOPES);
-    authUrl.searchParams.set('prompt', 'select_account');
+    authUrl.searchParams.set('access_type', 'offline'); // Para obter refresh_token
+    authUrl.searchParams.set('prompt', 'consent'); // Força consentimento para garantir refresh_token
 
     window.location.href = authUrl.toString();
   };
@@ -197,6 +155,43 @@ export default function AutomationsPage() {
       toast.success(`${email} definida como conta de armazenamento`);
       fetchData();
     }
+  };
+
+  // Verificar se token expirou
+  const isTokenExpired = (expiryDate: string) => {
+    return new Date(expiryDate) < new Date();
+  };
+
+  // Verificar se há algum token expirado (especialmente o primary)
+  const hasExpiredPrimaryToken = accounts.some(acc => acc.is_primary_storage && isTokenExpired(acc.token_expiry));
+
+  // Re-autenticar uma conta específica
+  const handleReauthAccount = (email: string) => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+    if (!clientId) {
+      toast.error('Google Client ID não configurado');
+      return;
+    }
+
+    if (!supabaseUrl) {
+      toast.error('Supabase URL não configurado');
+      return;
+    }
+
+    // Novo fluxo: Authorization Code com refresh tokens
+    const redirectUri = `${supabaseUrl}/functions/v1/oauth-callback`;
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    authUrl.searchParams.set('client_id', clientId);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('response_type', 'code'); // CODE em vez de token
+    authUrl.searchParams.set('scope', GOOGLE_SCOPES);
+    authUrl.searchParams.set('access_type', 'offline'); // Para obter refresh_token
+    authUrl.searchParams.set('login_hint', email); // Pre-selecciona o email
+    authUrl.searchParams.set('prompt', 'consent'); // Força consentimento para garantir refresh_token
+
+    window.location.href = authUrl.toString();
   };
 
   const getStatusBadge = (status: string) => {
@@ -253,6 +248,17 @@ export default function AutomationsPage() {
             </div>
           </CardHeader>
           <CardContent>
+            {/* Alerta se token principal expirou */}
+            {hasExpiredPrimaryToken && (
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-red-50 border border-red-200 mb-4">
+                <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-medium text-red-800">Token expirado!</p>
+                  <p className="text-sm text-red-700">A conta de armazenamento principal tem o token expirado. Re-autentica para continuar a usar o upload e sincronização.</p>
+                </div>
+              </div>
+            )}
+
             {accounts.length === 0 ? (
               <div className="flex items-center gap-3 p-4 rounded-lg bg-yellow-50 border border-yellow-200">
                 <AlertTriangle className="h-5 w-5 text-yellow-600" />
@@ -263,61 +269,86 @@ export default function AutomationsPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {accounts.map((acc) => (
-                  <div
-                    key={acc.id}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      acc.is_primary_storage
-                        ? 'bg-primary/5 border-primary/30'
-                        : 'bg-background'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                        acc.is_primary_storage
-                          ? 'bg-primary/20'
-                          : 'bg-primary/10'
-                      }`}>
-                        <Mail className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{acc.email}</p>
-                          {acc.is_primary_storage && (
-                            <Badge className="bg-primary/20 text-primary border-primary/30 gap-1">
-                              <Star className="h-3 w-3" />
-                              Armazenamento
-                            </Badge>
-                          )}
+                {accounts.map((acc) => {
+                  const expired = isTokenExpired(acc.token_expiry);
+                  return (
+                    <div
+                      key={acc.id}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        expired
+                          ? 'bg-red-50 border-red-200'
+                          : acc.is_primary_storage
+                            ? 'bg-primary/5 border-primary/30'
+                            : 'bg-background'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                          expired
+                            ? 'bg-red-100'
+                            : acc.is_primary_storage
+                              ? 'bg-primary/20'
+                              : 'bg-primary/10'
+                        }`}>
+                          <Mail className={`h-5 w-5 ${expired ? 'text-red-600' : 'text-primary'}`} />
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          Token expira: {new Date(acc.token_expiry).toLocaleString('pt-PT')}
-                        </p>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium">{acc.email}</p>
+                            {acc.is_primary_storage && (
+                              <Badge className="bg-primary/20 text-primary border-primary/30 gap-1">
+                                <Star className="h-3 w-3" />
+                                Armazenamento
+                              </Badge>
+                            )}
+                            {expired && (
+                              <Badge variant="destructive" className="gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                Expirado
+                              </Badge>
+                            )}
+                          </div>
+                          <p className={`text-xs ${expired ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                            {expired ? 'Token expirou em: ' : 'Token expira: '}
+                            {new Date(acc.token_expiry).toLocaleString('pt-PT')}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {!acc.is_primary_storage && (
+                      <div className="flex items-center gap-1">
+                        {expired && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 border-red-300 hover:bg-red-50 gap-1"
+                            onClick={() => handleReauthAccount(acc.email)}
+                          >
+                            <LogIn className="h-4 w-4" />
+                            Re-autenticar
+                          </Button>
+                        )}
+                        {!acc.is_primary_storage && !expired && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-primary"
+                            onClick={() => handleSetPrimaryStorage(acc.id, acc.email)}
+                            title="Definir como conta de armazenamento"
+                          >
+                            <Star className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground hover:text-primary"
-                          onClick={() => handleSetPrimaryStorage(acc.id, acc.email)}
-                          title="Definir como conta de armazenamento"
+                          size="icon"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleRemoveAccount(acc.id, acc.email)}
                         >
-                          <Star className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleRemoveAccount(acc.id, acc.email)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

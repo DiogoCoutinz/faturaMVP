@@ -1,12 +1,13 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileText, Loader2, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { Upload, FileText, Loader2, CheckCircle2, XCircle, AlertTriangle, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { processInvoiceUpload } from '@/lib/invoiceProcessor';
 import { useAuth } from '@/features/auth/AuthContext';
 import { supabase } from '@/lib/supabase/client';
+import { Link } from 'react-router-dom';
 import type { Invoice } from '@/types/database';
 
 interface FileUploadStatus {
@@ -16,6 +17,12 @@ interface FileUploadStatus {
   invoice?: Invoice;
 }
 
+interface StorageAccount {
+  access_token: string;
+  token_expiry: string;
+  email: string;
+}
+
 const MAX_FILES = 10;
 
 export function UploadZone() {
@@ -23,24 +30,28 @@ export function UploadZone() {
   const [fileStatuses, setFileStatuses] = useState<FileUploadStatus[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [storageToken, setStorageToken] = useState<string | null>(null);
+  const [storageAccount, setStorageAccount] = useState<StorageAccount | null>(null);
   const abortRef = useRef(false);
   const processingRef = useRef(false);
 
   // Fetch primary storage account token
   useEffect(() => {
-    const fetchStorageToken = async () => {
+    const fetchStorageAccount = async () => {
       const { data } = await supabase
         .from('user_oauth_tokens')
-        .select('access_token')
+        .select('access_token, token_expiry, email')
         .eq('provider', 'google')
         .eq('is_primary_storage', true)
         .single();
 
-      setStorageToken(data?.access_token || null);
+      setStorageAccount(data || null);
     };
-    fetchStorageToken();
+    fetchStorageAccount();
   }, []);
+
+  // Verificar se token expirou
+  const isTokenExpired = storageAccount ? new Date(storageAccount.token_expiry) < new Date() : false;
+  const storageToken = storageAccount?.access_token || null;
 
   // Processar ficheiros em fila
   useEffect(() => {
@@ -110,6 +121,15 @@ export function UploadZone() {
       return;
     }
 
+    if (isTokenExpired) {
+      setFileStatuses([{
+        file: acceptedFiles[0],
+        status: 'error',
+        message: 'Token expirado! Re-autentique a conta em Automações.',
+      }]);
+      return;
+    }
+
     // Limitar a MAX_FILES
     const filesToProcess = acceptedFiles.slice(0, MAX_FILES);
 
@@ -122,7 +142,7 @@ export function UploadZone() {
     setFileStatuses(newStatuses);
     abortRef.current = false;
     setIsProcessing(true);
-  }, [storageToken]);
+  }, [storageToken, isTokenExpired]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -159,6 +179,51 @@ export function UploadZone() {
 
   return (
     <div className="space-y-6">
+      {/* ALERTA DE TOKEN EXPIRADO */}
+      {isTokenExpired && storageAccount && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-red-800">Token expirado!</p>
+                <p className="text-sm text-red-700">
+                  A conta <strong>{storageAccount.email}</strong> tem o token expirado.
+                  Re-autentique em Automações para poder fazer upload.
+                </p>
+              </div>
+              <Link to="/automations">
+                <Button variant="outline" className="border-red-300 text-red-700 hover:bg-red-100">
+                  Ir para Automações
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* SEM CONTA CONFIGURADA */}
+      {!storageAccount && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-yellow-800">Nenhuma conta configurada</p>
+                <p className="text-sm text-yellow-700">
+                  Adicione uma conta Google em Automações para poder fazer upload de faturas.
+                </p>
+              </div>
+              <Link to="/automations">
+                <Button variant="outline" className="border-yellow-300 text-yellow-700 hover:bg-yellow-100">
+                  Configurar Conta
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* DRAG & DROP ZONE */}
       <Card>
         <CardHeader>
