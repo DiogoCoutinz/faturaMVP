@@ -146,6 +146,14 @@ export default function AutomationsPage() {
     authUrl.searchParams.set('scope', GOOGLE_SCOPES);
     authUrl.searchParams.set('prompt', 'select_account');
 
+    // DEBUG - remove after testing
+    console.log('OAuth Debug:', {
+      clientId,
+      redirectUri,
+      fullUrl: authUrl.toString()
+    });
+    alert(`Redirect URI: ${redirectUri}\nClient ID: ${clientId?.substring(0, 20)}...`);
+
     window.location.href = authUrl.toString();
   };
 
