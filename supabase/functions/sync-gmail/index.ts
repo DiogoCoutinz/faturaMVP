@@ -18,6 +18,7 @@ interface OAuthToken {
   token_expiry: string;
   scopes: string[];
   email?: string;
+  is_primary_storage?: boolean;
 }
 
 interface GmailMessage {
@@ -97,8 +98,8 @@ async function getValidAccessToken(token: OAuthToken): Promise<string | null> {
 }
 
 async function listUnreadInvoices(accessToken: string, maxResults: number = 20): Promise<GmailMessage[]> {
-  const currentYear = new Date().getFullYear();
-  const query = ["label:unread", "has:attachment", "subject:(fatura OR invoice OR recibo)", "after:" + currentYear + "/01/01"].join(" ");
+  // Buscar emails das últimas 24 horas com anexos
+  const query = "newer_than:1d has:attachment";
   console.log("Query Gmail:", query);
   const response = await fetch(
     "https://gmail.googleapis.com/gmail/v1/users/me/messages?q=" + encodeURIComponent(query) + "&maxResults=" + maxResults,
@@ -279,10 +280,14 @@ async function checkDuplicate(geminiData: GeminiInvoiceData): Promise<boolean> {
   return (data?.length || 0) > 0;
 }
 
-async function syncAccountEmails(accessToken: string, userId: string): Promise<{ processed: number; duplicates: number; errors: string[] }> {
+async function syncAccountEmails(
+  gmailAccessToken: string,
+  storageAccessToken: string,
+  userId: string
+): Promise<{ processed: number; duplicates: number; errors: string[] }> {
   const result = { processed: 0, duplicates: 0, errors: [] as string[] };
   try {
-    const emails = await listUnreadInvoices(accessToken, 20);
+    const emails = await listUnreadInvoices(gmailAccessToken, 20);
     if (emails.length === 0) {
       console.log("Nenhum email novo");
       return result;
@@ -291,7 +296,7 @@ async function syncAccountEmails(accessToken: string, userId: string): Promise<{
     for (const email of emails) {
       try {
         console.log("Processando: " + email.subject);
-        const attachments = await getEmailAttachments(accessToken, email.id);
+        const attachments = await getEmailAttachments(gmailAccessToken, email.id);
         const pdfAttachments = attachments.filter((a) => a.filename.toLowerCase().endsWith(".pdf"));
         if (pdfAttachments.length === 0) {
           result.errors.push("Email sem PDFs: " + email.subject);
@@ -299,7 +304,7 @@ async function syncAccountEmails(accessToken: string, userId: string): Promise<{
         }
         for (const attachment of pdfAttachments) {
           try {
-            const pdfData = await getAttachmentData(accessToken, email.id, attachment.attachmentId);
+            const pdfData = await getAttachmentData(gmailAccessToken, email.id, attachment.attachmentId);
             let binary = "";
             for (let i = 0; i < pdfData.length; i++) {
               binary += String.fromCharCode(pdfData[i]);
@@ -314,18 +319,19 @@ async function syncAccountEmails(accessToken: string, userId: string): Promise<{
             if (isDuplicate) {
               console.log("Duplicado: " + geminiData.supplier_name);
               result.duplicates++;
-              await markEmailAsRead(accessToken, email.id);
+              await markEmailAsRead(gmailAccessToken, email.id);
               continue;
             }
             const year = geminiData.doc_year || new Date().getFullYear();
-            const rootFolderId = await ensureFolder(accessToken, "FATURAS");
-            const yearFolderId = await ensureFolder(accessToken, year.toString(), rootFolderId);
+            // Usar storageAccessToken para todas as operações no Drive (conta de armazenamento principal)
+            const rootFolderId = await ensureFolder(storageAccessToken, "FATURAS");
+            const yearFolderId = await ensureFolder(storageAccessToken, year.toString(), rootFolderId);
             let costTypeFolderName = "Por Classificar";
             if (geminiData.cost_type === "custo_fixo") costTypeFolderName = "Custos Fixos";
             else if (geminiData.cost_type === "custo_variavel") costTypeFolderName = "Custos Variaveis";
-            const costTypeFolderId = await ensureFolder(accessToken, costTypeFolderName, yearFolderId);
+            const costTypeFolderId = await ensureFolder(storageAccessToken, costTypeFolderName, yearFolderId);
             const pdfFileName = (geminiData.doc_date + "_" + geminiData.supplier_name + "_" + (geminiData.total_amount?.toFixed(2) || "0.00") + ".pdf").replace(/[/\\?%*:|"<>]/g, "_");
-            const driveFile = await uploadToDrive(accessToken, pdfData, pdfFileName, costTypeFolderId);
+            const driveFile = await uploadToDrive(storageAccessToken, pdfData, pdfFileName, costTypeFolderId);
             const { error: insertError } = await supabase.from("invoices").insert({
               user_id: userId,
               file_url: driveFile.webViewLink,
@@ -353,7 +359,7 @@ async function syncAccountEmails(accessToken: string, userId: string): Promise<{
             result.errors.push(attachment.filename + ": " + msg);
           }
         }
-        await markEmailAsRead(accessToken, email.id);
+        await markEmailAsRead(gmailAccessToken, email.id);
       } catch (emailError) {
         const msg = emailError instanceof Error ? emailError.message : "Erro";
         result.errors.push("Email " + email.subject + ": " + msg);
@@ -395,6 +401,20 @@ Deno.serve(async (req) => {
       console.log("Nenhum token configurado");
       return new Response(JSON.stringify({ success: true, message: "Nenhum token configurado", accounts_processed: 0 }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
+
+    // Buscar a conta de armazenamento principal (onde os ficheiros serão guardados)
+    const storageAccount = (tokens as OAuthToken[]).find(t => t.is_primary_storage);
+    if (!storageAccount) {
+      throw new Error("Nenhuma conta de armazenamento configurada. Defina uma conta como principal.");
+    }
+
+    // Obter token válido para a conta de armazenamento
+    const storageAccessToken = await getValidAccessToken(storageAccount);
+    if (!storageAccessToken) {
+      throw new Error("Falha ao obter token da conta de armazenamento: " + (storageAccount.email || storageAccount.user_id));
+    }
+    console.log("Conta de armazenamento: " + (storageAccount.email || storageAccount.user_id));
+
     console.log(tokens.length + " conta(s) para sincronizar");
     for (const token of tokens as OAuthToken[]) {
       const accountLabel = token.email || token.user_id;
@@ -411,7 +431,7 @@ Deno.serve(async (req) => {
           }
           continue;
         }
-        const syncResult = await syncAccountEmails(accessToken, token.user_id);
+        const syncResult = await syncAccountEmails(accessToken, storageAccessToken, token.user_id);
         results.push({ user_id: token.user_id, email: token.email, ...syncResult });
         if (logId) {
           await supabase.from("sync_logs").update({ completed_at: new Date().toISOString(), status: syncResult.errors.length > 0 ? (syncResult.processed > 0 ? "partial" : "failed") : "success", processed_count: syncResult.processed, duplicate_count: syncResult.duplicates, error_count: syncResult.errors.length, errors: syncResult.errors }).eq("id", logId);

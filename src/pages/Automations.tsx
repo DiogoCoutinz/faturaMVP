@@ -40,6 +40,8 @@ interface ConnectedAccount {
 }
 
 const GOOGLE_SCOPES = [
+  'email',
+  'profile',
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.modify',
   'https://www.googleapis.com/auth/drive.file',
@@ -83,7 +85,16 @@ export default function AutomationsPage() {
           const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
+
+          if (!userInfoRes.ok) {
+            throw new Error(`Erro ao obter info do utilizador: ${userInfoRes.status}`);
+          }
+
           const userInfo = await userInfoRes.json();
+
+          if (!userInfo.email) {
+            throw new Error('Email não disponível na resposta do Google');
+          }
 
           // Verificar se já existe
           const { data: existing } = await supabase
@@ -106,21 +117,30 @@ export default function AutomationsPage() {
           } else {
             // Criar novo registo
             const { data: { user } } = await supabase.auth.getUser();
+
+            // Verificar se é a primeira conta (definir como primary)
+            const { count } = await supabase
+              .from('user_oauth_tokens')
+              .select('*', { count: 'exact', head: true })
+              .eq('provider', 'google');
+
             await supabase.from('user_oauth_tokens').insert({
-              user_id: user?.id || userInfo.id,
+              user_id: user?.id || null,
               provider: 'google',
               email: userInfo.email,
               access_token: accessToken,
               refresh_token: refreshToken || '',
               token_expiry: new Date(Date.now() + 3600 * 1000).toISOString(),
               scopes: GOOGLE_SCOPES.split(' '),
+              is_primary_storage: count === 0, // Primeira conta é primary
             });
             toast.success(`Conta ${userInfo.email} adicionada!`);
           }
 
           fetchData();
-        } catch {
-          toast.error('Erro ao guardar conta');
+        } catch (err) {
+          console.error('OAuth callback error:', err);
+          toast.error(err instanceof Error ? err.message : 'Erro ao guardar conta');
         }
       }
     };
@@ -145,14 +165,6 @@ export default function AutomationsPage() {
     authUrl.searchParams.set('response_type', 'token');
     authUrl.searchParams.set('scope', GOOGLE_SCOPES);
     authUrl.searchParams.set('prompt', 'select_account');
-
-    // DEBUG - remove after testing
-    console.log('OAuth Debug:', {
-      clientId,
-      redirectUri,
-      fullUrl: authUrl.toString()
-    });
-    alert(`Redirect URI: ${redirectUri}\nClient ID: ${clientId?.substring(0, 20)}...`);
 
     window.location.href = authUrl.toString();
   };

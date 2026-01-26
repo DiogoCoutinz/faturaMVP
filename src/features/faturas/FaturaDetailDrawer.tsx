@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { X, ExternalLink, Building2, Calendar, Hash, Tag, Pencil, Trash2, Save, XCircle, Table2, CheckCircle } from "lucide-react";
 import type { Invoice } from "@/types/database";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQueryClient } from "@tanstack/react-query";
 import { updateInvoiceEverywhere } from "@/lib/sync/updateInvoice";
 import { deleteInvoiceEverywhere } from "@/lib/sync/deleteInvoice";
-import { useAuth } from "@/features/auth/AuthContext";
+import { supabase } from "@/lib/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { toast as sonnerToast } from "sonner";
 import {
@@ -50,8 +50,23 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
   const [editData, setEditData] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const { user, providerToken } = useAuth();
+  const [storageToken, setStorageToken] = useState<string | null>(null);
   const queryClient = useQueryClient();
+
+  // Buscar token da conta de armazenamento principal
+  useEffect(() => {
+    const fetchStorageToken = async () => {
+      const { data } = await supabase
+        .from('user_oauth_tokens')
+        .select('access_token')
+        .eq('provider', 'google')
+        .eq('is_primary_storage', true)
+        .single();
+
+      setStorageToken(data?.access_token || null);
+    };
+    fetchStorageToken();
+  }, [open]);
 
   // Se a fatura está em revisão, mostrar modo de revisão expandido automaticamente
   const isReviewMode = fatura?.status === 'review';
@@ -88,10 +103,10 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
   }, []);
 
   const handleSave = async () => {
-    if (!fatura || !user || !providerToken) {
+    if (!fatura || !storageToken) {
       toast({
         title: "Erro",
-        description: "Dados de autenticação inválidos.",
+        description: "Token de armazenamento não disponível. Verifique se há uma conta configurada.",
         variant: "destructive",
       });
       return;
@@ -138,8 +153,8 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
     try {
       const result = await updateInvoiceEverywhere({
         invoiceId: fatura.id,
-        userId: user.id,
-        accessToken: providerToken,
+        userId: fatura.user_id,
+        accessToken: storageToken,
         updates,
       });
 
@@ -170,14 +185,21 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
   };
 
   const handleDelete = async () => {
-    if (!fatura || !user || !providerToken) return;
+    if (!fatura || !storageToken) {
+      toast({
+        title: "Erro",
+        description: "Token de armazenamento não disponível. Verifique se há uma conta configurada.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsDeleting(true);
     try {
       const result = await deleteInvoiceEverywhere({
         invoiceId: fatura.id,
-        userId: user.id,
-        accessToken: providerToken,
+        userId: fatura.user_id,
+        accessToken: storageToken,
       });
 
       if (result.success) {

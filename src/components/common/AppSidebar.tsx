@@ -7,6 +7,7 @@ import {
   Building2,
   ChevronLeft,
   Menu,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -105,14 +106,40 @@ export function AppSidebar({ isCollapsed, onToggle }: AppSidebarProps) {
       </ScrollArea>
 
       {/* Footer */}
-      <div className="border-t border-sidebar-border p-4 shrink-0 overflow-hidden text-center">
+      <div className="border-t border-sidebar-border p-4 shrink-0 overflow-hidden">
         {isCollapsed ? (
-          <div className="mx-auto h-2 w-2 rounded-full bg-sidebar-primary" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              localStorage.removeItem('faturasai_logged_in');
+              localStorage.removeItem('faturasai_user');
+              navigate('/login');
+            }}
+            className="w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive"
+            title="Sair"
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
         ) : (
-          <div className="rounded-lg bg-sidebar-accent/50 p-3 animate-fade-in text-center">
-            <p className="text-[10px] text-sidebar-foreground/50 uppercase tracking-widest font-semibold">
-              Equipa FB • 2026
-            </p>
+          <div className="space-y-3 animate-fade-in">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                localStorage.removeItem('faturasai_logged_in');
+                localStorage.removeItem('faturasai_user');
+                navigate('/login');
+              }}
+              className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive"
+            >
+              <LogOut className="h-4 w-4" />
+              Sair
+            </Button>
+            <div className="rounded-lg bg-sidebar-accent/50 p-3 text-center">
+              <p className="text-[10px] text-sidebar-foreground/50 uppercase tracking-widest font-semibold">
+                Equipa FB • 2026
+              </p>
+            </div>
           </div>
         )}
       </div>
