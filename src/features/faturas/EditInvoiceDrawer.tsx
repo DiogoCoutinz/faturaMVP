@@ -7,7 +7,10 @@ import { useState, useEffect, useRef } from 'react';
 import { Invoice } from '@/types/database';
 import { useAuth } from '@/features/auth/AuthContext';
 import { updateInvoiceEverywhere } from '@/lib/sync/updateInvoice';
+import { supabase } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 import {
   Dialog,
   DialogContent,
@@ -37,13 +40,63 @@ export function EditInvoiceDrawer({
   onOpenChange,
   onSuccess,
 }: EditInvoiceDrawerProps) {
-  const { user, providerToken } = useAuth();
+  const { user } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateResult, setUpdateResult] = useState<{
     type: 'success' | 'warning' | 'error';
     message: string;
   } | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [storageToken, setStorageToken] = useState<string | null>(null);
+
+  // Fetch storage token with auto-refresh
+  useEffect(() => {
+    if (!open) return;
+
+    const fetchStorageToken = async () => {
+      const { data } = await supabase
+        .from('user_oauth_tokens')
+        .select('access_token, token_expiry, email')
+        .eq('provider', 'google')
+        .eq('is_primary_storage', true)
+        .single();
+
+      if (data) {
+        const isExpired = new Date(data.token_expiry) < new Date();
+
+        if (isExpired && data.email && SUPABASE_URL) {
+          // Auto-refresh token
+          try {
+            const response = await fetch(`${SUPABASE_URL}/functions/v1/refresh-token`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: data.email }),
+            });
+
+            if (response.ok) {
+              // Fetch updated token
+              const { data: refreshedData } = await supabase
+                .from('user_oauth_tokens')
+                .select('access_token')
+                .eq('email', data.email)
+                .single();
+
+              if (refreshedData) {
+                setStorageToken(refreshedData.access_token);
+                return;
+              }
+            }
+          } catch (error) {
+            console.error('Error refreshing token:', error);
+          }
+        }
+
+        setStorageToken(data.access_token);
+      }
+    };
+
+    fetchStorageToken();
+  }, [open]);
 
   // Form state
   const [supplierName, setSupplierName] = useState('');
@@ -77,8 +130,8 @@ export function EditInvoiceDrawer({
   };
 
   const handleSave = async () => {
-    if (!invoice || !user || !providerToken) {
-      toast.error('Dados de autenticação inválidos');
+    if (!invoice || !user || !storageToken) {
+      toast.error('Dados de autenticação inválidos. Verifique a conta em Automações.');
       return;
     }
 
@@ -191,7 +244,7 @@ export function EditInvoiceDrawer({
       const result = await updateInvoiceEverywhere({
         invoiceId: invoice.id,
         userId: user.id,
-        accessToken: providerToken,
+        accessToken: storageToken,
         updates,
       });
 

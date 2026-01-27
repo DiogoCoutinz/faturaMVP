@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import { AppSidebar } from "./AppSidebar";
 import { cn } from "@/lib/utils";
+import { useTokenRefresh } from "@/hooks/useTokenRefresh";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -8,6 +9,9 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Renovar tokens expirados automaticamente quando a app carrega
+  useTokenRefresh();
 
   return (
     <div className="min-h-screen bg-background">
