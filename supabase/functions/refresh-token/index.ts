@@ -101,19 +101,33 @@ Deno.serve(async (req) => {
       const errorData = await tokenResponse.text();
       console.error("Token refresh failed:", errorData);
 
+      // Parse Google error for debugging
+      let googleError = errorData;
+      try {
+        const parsed = JSON.parse(errorData);
+        googleError = parsed.error_description || parsed.error || errorData;
+      } catch {
+        // Keep raw error
+      }
+
       // If refresh token is invalid, mark the account
       if (tokenResponse.status === 400 || tokenResponse.status === 401) {
         return new Response(
           JSON.stringify({
-            error: "Refresh token inválido. Re-autentique a conta.",
-            needs_reauth: true
+            error: `Refresh token inválido: ${googleError}`,
+            google_error: googleError,
+            needs_reauth: true,
+            debug: {
+              client_id_prefix: clientId.substring(0, 20),
+              refresh_token_prefix: account.refresh_token.substring(0, 15),
+            }
           }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       return new Response(
-        JSON.stringify({ error: "Falha ao renovar token" }),
+        JSON.stringify({ error: `Falha ao renovar token: ${googleError}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
