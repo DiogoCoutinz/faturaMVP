@@ -45,6 +45,8 @@ interface FaturaDetailDrawerProps {
   onClose: () => void;
 }
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
 export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawerProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<Record<string, string>>({});
@@ -53,17 +55,51 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
   const [storageToken, setStorageToken] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  // Buscar token da conta de armazenamento principal
+  // Buscar token da conta de armazenamento principal (com auto-refresh)
   useEffect(() => {
     const fetchStorageToken = async () => {
       const { data } = await supabase
         .from('user_oauth_tokens')
-        .select('access_token')
+        .select('access_token, token_expiry, email')
         .eq('provider', 'google')
         .eq('is_primary_storage', true)
         .single();
 
-      setStorageToken(data?.access_token || null);
+      if (!data) {
+        setStorageToken(null);
+        return;
+      }
+
+      // Verificar se token expirou
+      const isExpired = new Date(data.token_expiry) < new Date();
+
+      if (isExpired && data.email && SUPABASE_URL) {
+        // Tentar renovar automaticamente
+        try {
+          const response = await fetch(`${SUPABASE_URL}/functions/v1/refresh-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: data.email }),
+          });
+
+          if (response.ok) {
+            // Buscar token atualizado
+            const { data: refreshedData } = await supabase
+              .from('user_oauth_tokens')
+              .select('access_token')
+              .eq('email', data.email)
+              .eq('provider', 'google')
+              .single();
+
+            setStorageToken(refreshedData?.access_token || null);
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to refresh token:', error);
+        }
+      }
+
+      setStorageToken(data.access_token);
     };
     fetchStorageToken();
   }, [open]);
