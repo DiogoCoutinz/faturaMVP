@@ -39,6 +39,7 @@ interface ConnectedAccount {
   email: string;
   token_expiry: string;
   is_primary_storage: boolean;
+  refresh_token: string | null;
 }
 
 const GOOGLE_SCOPES = [
@@ -60,7 +61,7 @@ export default function AutomationsPage() {
     setLoading(true);
 
     const [accountsRes, logsRes] = await Promise.all([
-      supabase.from('user_oauth_tokens').select('id, email, token_expiry, is_primary_storage').eq('provider', 'google'),
+      supabase.from('user_oauth_tokens').select('id, email, token_expiry, is_primary_storage, refresh_token').eq('provider', 'google'),
       supabase.from('sync_logs').select('*').order('started_at', { ascending: false }).limit(5),
     ]);
 
@@ -162,8 +163,15 @@ export default function AutomationsPage() {
     return new Date(expiryDate) < new Date();
   };
 
-  // Verificar se há algum token expirado (especialmente o primary)
-  const hasExpiredPrimaryToken = accounts.some(acc => acc.is_primary_storage && isTokenExpired(acc.token_expiry));
+  // Verificar se há algum token expirado SEM refresh_token (precisa re-autenticar)
+  const hasExpiredPrimaryTokenWithoutRefresh = accounts.some(
+    acc => acc.is_primary_storage && isTokenExpired(acc.token_expiry) && !acc.refresh_token
+  );
+
+  // Verificar se o primary tem refresh_token (renova automaticamente)
+  const primaryHasRefreshToken = accounts.some(
+    acc => acc.is_primary_storage && acc.refresh_token
+  );
 
   // Re-autenticar uma conta específica
   const handleReauthAccount = (email: string) => {
@@ -248,13 +256,13 @@ export default function AutomationsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {/* Alerta se token principal expirou */}
-            {hasExpiredPrimaryToken && (
+            {/* Alerta se token principal expirou SEM refresh_token */}
+            {hasExpiredPrimaryTokenWithoutRefresh && (
               <div className="flex items-center gap-3 p-4 rounded-lg bg-red-50 border border-red-200 mb-4">
                 <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
                 <div className="flex-1">
                   <p className="font-medium text-red-800">Token expirado!</p>
-                  <p className="text-sm text-red-700">A conta de armazenamento principal tem o token expirado. Re-autentica para continuar a usar o upload e sincronização.</p>
+                  <p className="text-sm text-red-700">A conta de armazenamento principal não tem refresh token. Re-autentica para continuar a usar o upload e sincronização.</p>
                 </div>
               </div>
             )}
@@ -271,11 +279,13 @@ export default function AutomationsPage() {
               <div className="space-y-2">
                 {accounts.map((acc) => {
                   const expired = isTokenExpired(acc.token_expiry);
+                  const hasRefresh = !!acc.refresh_token;
+                  const needsReauth = expired && !hasRefresh;
                   return (
                     <div
                       key={acc.id}
                       className={`flex items-center justify-between p-3 rounded-lg border ${
-                        expired
+                        needsReauth
                           ? 'bg-red-50 border-red-200'
                           : acc.is_primary_storage
                             ? 'bg-primary/5 border-primary/30'
@@ -284,13 +294,13 @@ export default function AutomationsPage() {
                     >
                       <div className="flex items-center gap-3">
                         <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                          expired
+                          needsReauth
                             ? 'bg-red-100'
                             : acc.is_primary_storage
                               ? 'bg-primary/20'
                               : 'bg-primary/10'
                         }`}>
-                          <Mail className={`h-5 w-5 ${expired ? 'text-red-600' : 'text-primary'}`} />
+                          <Mail className={`h-5 w-5 ${needsReauth ? 'text-red-600' : 'text-primary'}`} />
                         </div>
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -301,21 +311,31 @@ export default function AutomationsPage() {
                                 Armazenamento
                               </Badge>
                             )}
-                            {expired && (
+                            {needsReauth && (
                               <Badge variant="destructive" className="gap-1">
                                 <AlertCircle className="h-3 w-3" />
-                                Expirado
+                                Re-autenticar
+                              </Badge>
+                            )}
+                            {hasRefresh && (
+                              <Badge className="bg-green-100 text-green-700 border-green-300 gap-1">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Renova auto
                               </Badge>
                             )}
                           </div>
-                          <p className={`text-xs ${expired ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-                            {expired ? 'Token expirou em: ' : 'Token expira: '}
-                            {new Date(acc.token_expiry).toLocaleString('pt-PT')}
+                          <p className="text-xs text-muted-foreground">
+                            {hasRefresh
+                              ? 'Token renova automaticamente'
+                              : expired
+                                ? `Token expirou em: ${new Date(acc.token_expiry).toLocaleString('pt-PT')}`
+                                : `Token expira: ${new Date(acc.token_expiry).toLocaleString('pt-PT')}`
+                            }
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        {expired && (
+                        {needsReauth && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -326,7 +346,7 @@ export default function AutomationsPage() {
                             Re-autenticar
                           </Button>
                         )}
-                        {!acc.is_primary_storage && !expired && (
+                        {!acc.is_primary_storage && !needsReauth && (
                           <Button
                             variant="ghost"
                             size="sm"
