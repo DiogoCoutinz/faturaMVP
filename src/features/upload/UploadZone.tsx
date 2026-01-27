@@ -24,6 +24,7 @@ interface StorageAccount {
 }
 
 const MAX_FILES = 10;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 export function UploadZone() {
   const { user } = useAuth();
@@ -31,8 +32,57 @@ export function UploadZone() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [storageAccount, setStorageAccount] = useState<StorageAccount | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const abortRef = useRef(false);
   const processingRef = useRef(false);
+
+  // Função para renovar o token automaticamente
+  const refreshToken = async (email: string): Promise<boolean> => {
+    if (!SUPABASE_URL) return false;
+
+    setIsRefreshing(true);
+    setRefreshError(null);
+
+    try {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/refresh-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        if (result.needs_reauth) {
+          setRefreshError('Refresh token inválido. Re-autentique a conta em Automações.');
+          return false;
+        }
+        setRefreshError(result.error || 'Erro ao renovar token');
+        return false;
+      }
+
+      // Buscar token atualizado da base de dados
+      const { data } = await supabase
+        .from('user_oauth_tokens')
+        .select('access_token, token_expiry, email')
+        .eq('email', email)
+        .eq('provider', 'google')
+        .single();
+
+      if (data) {
+        setStorageAccount(data);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Refresh token error:', error);
+      setRefreshError('Erro de conexão ao renovar token');
+      return false;
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Fetch primary storage account token
   useEffect(() => {
@@ -44,13 +94,24 @@ export function UploadZone() {
         .eq('is_primary_storage', true)
         .single();
 
-      setStorageAccount(data || null);
+      if (data) {
+        setStorageAccount(data);
+
+        // Se token expirou, tentar renovar automaticamente
+        const isExpired = new Date(data.token_expiry) < new Date();
+        if (isExpired) {
+          console.log('Token expirado, a tentar renovar automaticamente...');
+          await refreshToken(data.email);
+        }
+      }
     };
     fetchStorageAccount();
   }, []);
 
-  // Verificar se token expirou
-  const isTokenExpired = storageAccount ? new Date(storageAccount.token_expiry) < new Date() : false;
+  // Verificar se token expirou (com 5 min de margem)
+  const isTokenExpired = storageAccount
+    ? new Date(storageAccount.token_expiry).getTime() < Date.now() + 5 * 60 * 1000
+    : false;
   const storageToken = storageAccount?.access_token || null;
 
   // Processar ficheiros em fila
@@ -112,7 +173,7 @@ export function UploadZone() {
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
 
-    if (!storageToken) {
+    if (!storageAccount) {
       setFileStatuses([{
         file: acceptedFiles[0],
         status: 'error',
@@ -121,11 +182,33 @@ export function UploadZone() {
       return;
     }
 
+    // Se token expirou, tentar renovar automaticamente
+    let currentToken = storageToken;
     if (isTokenExpired) {
+      console.log('Token expirado antes do upload, a tentar renovar...');
+      const refreshed = await refreshToken(storageAccount.email);
+      if (!refreshed) {
+        setFileStatuses([{
+          file: acceptedFiles[0],
+          status: 'error',
+          message: refreshError || 'Token expirado! Re-autentique a conta em Automações.',
+        }]);
+        return;
+      }
+      // Buscar token atualizado
+      const { data } = await supabase
+        .from('user_oauth_tokens')
+        .select('access_token')
+        .eq('email', storageAccount.email)
+        .single();
+      currentToken = data?.access_token || null;
+    }
+
+    if (!currentToken) {
       setFileStatuses([{
         file: acceptedFiles[0],
         status: 'error',
-        message: 'Token expirado! Re-autentique a conta em Automações.',
+        message: 'Erro ao obter token válido.',
       }]);
       return;
     }
@@ -142,7 +225,7 @@ export function UploadZone() {
     setFileStatuses(newStatuses);
     abortRef.current = false;
     setIsProcessing(true);
-  }, [storageToken, isTokenExpired]);
+  }, [storageAccount, storageToken, isTokenExpired, refreshError]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -179,8 +262,25 @@ export function UploadZone() {
 
   return (
     <div className="space-y-6">
-      {/* ALERTA DE TOKEN EXPIRADO */}
-      {isTokenExpired && storageAccount && (
+      {/* ALERTA DE TOKEN A RENOVAR */}
+      {isRefreshing && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 text-blue-600 shrink-0 animate-spin" />
+              <div className="flex-1">
+                <p className="font-medium text-blue-800">A renovar token...</p>
+                <p className="text-sm text-blue-700">
+                  A renovar automaticamente o token da conta <strong>{storageAccount?.email}</strong>.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ALERTA DE TOKEN EXPIRADO (só mostra se refresh falhou) */}
+      {isTokenExpired && storageAccount && !isRefreshing && refreshError && (
         <Card className="border-red-200 bg-red-50">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -188,8 +288,7 @@ export function UploadZone() {
               <div className="flex-1">
                 <p className="font-medium text-red-800">Token expirado!</p>
                 <p className="text-sm text-red-700">
-                  A conta <strong>{storageAccount.email}</strong> tem o token expirado.
-                  Re-autentique em Automações para poder fazer upload.
+                  {refreshError}
                 </p>
               </div>
               <Link to="/automations">
