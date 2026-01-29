@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
 import { analyzeInvoiceWithGemini, fileToBase64, type GeminiInvoiceData } from '@/lib/gemini';
-import { uploadInvoiceToDrive, ensureFolder, getOrCreateYearlySheet } from '@/lib/google/drive';
+import { uploadInvoiceToDrive, ensureFolder, getOrCreateYearlySheet, getTokenInfo } from '@/lib/google/drive';
 import { appendInvoiceToSheet } from '@/lib/google/sheets';
 import type { Invoice } from '@/types/database';
 
@@ -35,6 +35,42 @@ export async function processInvoiceUpload(
         success: false,
         error: 'Por favor, adicione uma conta Google em Automações primeiro.'
       };
+    }
+
+    // Verificar scopes do token ANTES de começar o processamento
+    console.log('[processInvoiceUpload] A verificar scopes do token...');
+    const tokenInfo = await getTokenInfo(accessToken);
+    if (tokenInfo) {
+      console.log('[processInvoiceUpload] Scopes:', tokenInfo.scopes);
+      console.log('[processInvoiceUpload] Email:', tokenInfo.email);
+
+      const hasDriveScope = tokenInfo.scopes.some(
+        s => s === 'https://www.googleapis.com/auth/drive' ||
+             s === 'https://www.googleapis.com/auth/drive.file'
+      );
+      const hasSheetsScope = tokenInfo.scopes.some(
+        s => s === 'https://www.googleapis.com/auth/spreadsheets'
+      );
+
+      if (!hasDriveScope) {
+        return {
+          success: false,
+          error: `Token sem permissão de Google Drive. Scopes atuais: [${tokenInfo.scopes.join(', ')}]. ` +
+                 `Vá a https://myaccount.google.com/permissions, remova o acesso desta app, e reconecte a conta em Automações.`
+        };
+      }
+
+      // drive.file é limitado - só funciona com ficheiros criados pela app
+      if (tokenInfo.scopes.includes('https://www.googleapis.com/auth/drive.file') &&
+          !tokenInfo.scopes.includes('https://www.googleapis.com/auth/drive')) {
+        console.warn('[processInvoiceUpload] AVISO: Token com drive.file (limitado) em vez de drive (completo)');
+      }
+
+      if (!hasSheetsScope) {
+        console.warn('[processInvoiceUpload] AVISO: Token sem permissão de Google Sheets');
+      }
+    } else {
+      console.warn('[processInvoiceUpload] Não foi possível verificar scopes do token');
     }
 
     const base64Data = await fileToBase64(file);

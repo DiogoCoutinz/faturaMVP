@@ -124,6 +124,8 @@ export default function AutomationsPage() {
     authUrl.searchParams.set('scope', GOOGLE_SCOPES);
     authUrl.searchParams.set('access_type', 'offline'); // Para obter refresh_token
     authUrl.searchParams.set('prompt', 'consent'); // Força consentimento para garantir refresh_token
+    // IMPORTANTE: Não incluir scopes anteriores - forçar nova autorização completa
+    authUrl.searchParams.set('include_granted_scopes', 'false');
 
     window.location.href = authUrl.toString();
   };
@@ -198,6 +200,8 @@ export default function AutomationsPage() {
     authUrl.searchParams.set('access_type', 'offline'); // Para obter refresh_token
     authUrl.searchParams.set('login_hint', email); // Pre-selecciona o email
     authUrl.searchParams.set('prompt', 'consent'); // Força consentimento para garantir refresh_token
+    // IMPORTANTE: Não incluir scopes anteriores - forçar nova autorização completa
+    authUrl.searchParams.set('include_granted_scopes', 'false');
 
     window.location.href = authUrl.toString();
   };

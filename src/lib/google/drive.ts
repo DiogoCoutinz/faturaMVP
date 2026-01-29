@@ -7,6 +7,31 @@
 /**
  * FASE 3: Encontra ou cria uma pasta (com parent opcional)
  */
+/**
+ * Verifica os scopes do token atual
+ */
+export async function getTokenInfo(accessToken: string): Promise<{ scopes: string[]; email?: string } | null> {
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${accessToken}`
+    );
+    if (!response.ok) {
+      console.error('[TokenInfo] Erro:', response.status);
+      return null;
+    }
+    const data = await response.json();
+    console.log('[TokenInfo] Scopes do token:', data.scope);
+    console.log('[TokenInfo] Email:', data.email);
+    return {
+      scopes: data.scope?.split(' ') || [],
+      email: data.email,
+    };
+  } catch (error) {
+    console.error('[TokenInfo] Erro ao verificar token:', error);
+    return null;
+  }
+}
+
 export async function ensureFolder(
   accessToken: string,
   folderName: string,
@@ -15,6 +40,9 @@ export async function ensureFolder(
   if (!accessToken) {
     throw new Error('Token de acesso não fornecido para criar pasta');
   }
+
+  // Log para debug - verificar scopes do token
+  console.log('[ensureFolder] A procurar pasta:', folderName, parentId ? `em ${parentId}` : '(raiz)');
 
   let query = `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`;
   if (parentId) {
@@ -32,6 +60,19 @@ export async function ensureFolder(
 
   if (!searchResponse.ok) {
     const errorText = await searchResponse.text();
+    console.error('[ensureFolder] ERRO na API Drive:', searchResponse.status, errorText);
+
+    // Se for erro de scopes, verificar e dar mensagem clara
+    if (searchResponse.status === 403 && errorText.includes('SCOPE_INSUFFICIENT')) {
+      const tokenInfo = await getTokenInfo(accessToken);
+      const scopesMsg = tokenInfo?.scopes?.join(', ') || 'não foi possível verificar';
+      throw new Error(
+        `Permissões insuficientes no Google Drive. ` +
+        `Scopes atuais: [${scopesMsg}]. ` +
+        `Por favor, vá a https://myaccount.google.com/permissions, remova o acesso desta app, e reconecte a conta.`
+      );
+    }
+
     throw new Error(`Erro ao procurar pasta: ${searchResponse.status} - ${errorText}`);
   }
 
