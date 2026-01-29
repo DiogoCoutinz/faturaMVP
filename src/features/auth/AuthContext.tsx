@@ -32,7 +32,7 @@ const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
   'https://www.googleapis.com/auth/gmail.modify', // Ler emails + marcar como lido (era .readonly)
-  'https://www.googleapis.com/auth/drive.file', // Upload ficheiros
+  'https://www.googleapis.com/auth/drive', // Acesso completo ao Drive (criar pastas, listar, upload)
   'https://www.googleapis.com/auth/spreadsheets', // Escrever sheets
 ].join(' ');
 
