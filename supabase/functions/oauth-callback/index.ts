@@ -69,14 +69,31 @@ Deno.serve(async (req) => {
     }
 
     const tokens = await tokenResponse.json();
+    console.log("=== OAUTH DEBUG ===");
     console.log("Tokens received:", {
       has_access_token: !!tokens.access_token,
       has_refresh_token: !!tokens.refresh_token,
       expires_in: tokens.expires_in,
+      // IMPORTANTE: O Google retorna os scopes REAIS concedidos aqui!
+      scope: tokens.scope,
     });
 
     if (!tokens.access_token) {
       return redirectWithError(frontendUrl, "Access token não recebido");
+    }
+
+    // Verificar scopes REAIS do token
+    const grantedScopes = tokens.scope ? tokens.scope.split(" ") : [];
+    console.log("Scopes REAIS concedidos pelo Google:", grantedScopes);
+
+    const hasDriveFullScope = grantedScopes.includes("https://www.googleapis.com/auth/drive");
+    const hasDriveFileScope = grantedScopes.includes("https://www.googleapis.com/auth/drive.file");
+    console.log("Tem drive (completo):", hasDriveFullScope);
+    console.log("Tem drive.file (limitado):", hasDriveFileScope);
+
+    if (!hasDriveFullScope && hasDriveFileScope) {
+      console.error("PROBLEMA: Token tem drive.file (limitado) em vez de drive (completo)!");
+      console.error("O utilizador precisa revogar o acesso em https://myaccount.google.com/permissions");
     }
 
     // Get user info from Google
@@ -113,7 +130,9 @@ Deno.serve(async (req) => {
       .eq("provider", "google")
       .single();
 
-    const scopes = [
+    // IMPORTANTE: Usar os scopes REAIS que o Google concedeu, não os que pedimos
+    // Isto permite diagnosticar problemas de permissões
+    const scopes = grantedScopes.length > 0 ? grantedScopes : [
       "email",
       "profile",
       "https://www.googleapis.com/auth/gmail.readonly",
@@ -121,6 +140,8 @@ Deno.serve(async (req) => {
       "https://www.googleapis.com/auth/drive",
       "https://www.googleapis.com/auth/spreadsheets",
     ];
+
+    console.log("Scopes a guardar na DB:", scopes);
 
     if (existing) {
       // Update existing account
