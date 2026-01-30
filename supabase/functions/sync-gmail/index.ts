@@ -270,9 +270,28 @@ async function uploadToDrive(accessToken: string, fileData: Uint8Array, fileName
   return { id: result.id, webViewLink: result.webViewLink || "https://drive.google.com/file/d/" + result.id + "/view" };
 }
 
+// Função para normalizar nomes de fornecedores
+function normalizeSupplierName(name: string | null): string | null {
+  if (!name) return null;
+  const upperName = name.toUpperCase().trim();
+
+  if (upperName.includes("INSTITUTO DOS REGISTOS") ||
+      upperName.includes("NOTARIADO") ||
+      upperName.includes("REGISTO PREDIAL")) {
+    return "IRN";
+  } else if (upperName.includes("PETRÓLEOS DE PORTUGAL") ||
+             upperName.includes("GALP ENERGIA")) {
+    return "GALP";
+  } else if (upperName.includes("NOS COMUNICAÇÕES") ||
+             upperName.includes("NOS SGPS")) {
+    return "NOS";
+  }
+  return upperName;
+}
+
 async function checkDuplicate(geminiData: GeminiInvoiceData): Promise<boolean> {
   // Normalizar nome
-  geminiData.supplier_name = geminiData.supplier_name?.toUpperCase().trim() || null;
+  geminiData.supplier_name = normalizeSupplierName(geminiData.supplier_name);
 
   // VERIFICAÇÃO 1: Se tem doc_number, verificar se já existe fatura com MESMO doc_number
   if (geminiData.doc_number) {
@@ -366,7 +385,7 @@ async function syncAccountEmails(
               cost_type: geminiData.cost_type,
               doc_date: geminiData.doc_date,
               doc_year: geminiData.doc_year,
-              supplier_name: geminiData.supplier_name?.toUpperCase().trim() || null,
+              supplier_name: normalizeSupplierName(geminiData.supplier_name),
               supplier_vat: geminiData.supplier_vat,
               doc_number: geminiData.doc_number,
               total_amount: geminiData.total_amount,

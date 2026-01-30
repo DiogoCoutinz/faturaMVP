@@ -33,9 +33,28 @@ class DuplicateInvoiceError extends Error {
 /**
  * FASE 2B: Verifica se uma fatura já existe no Supabase
  */
+// Função para normalizar nomes de fornecedores
+function normalizeSupplierName(name: string | null): string | null {
+  if (!name) return null;
+  const upperName = name.toUpperCase().trim();
+
+  if (upperName.includes('INSTITUTO DOS REGISTOS') ||
+      upperName.includes('NOTARIADO') ||
+      upperName.includes('REGISTO PREDIAL')) {
+    return 'IRN';
+  } else if (upperName.includes('PETRÓLEOS DE PORTUGAL') ||
+             upperName.includes('GALP ENERGIA')) {
+    return 'GALP';
+  } else if (upperName.includes('NOS COMUNICAÇÕES') ||
+             upperName.includes('NOS SGPS')) {
+    return 'NOS';
+  }
+  return upperName;
+}
+
 async function checkDuplicateInvoice(geminiData: GeminiInvoiceData): Promise<void> {
   // Normalizar nome do fornecedor
-  geminiData.supplier_name = geminiData.supplier_name?.toUpperCase().trim() || null;
+  geminiData.supplier_name = normalizeSupplierName(geminiData.supplier_name);
 
   // VERIFICAÇÃO 1: Se tem doc_number, verificar se já existe fatura com MESMO doc_number
   if (geminiData.doc_number) {
@@ -279,7 +298,7 @@ export async function syncGmailInvoices(
               cost_type: geminiData.cost_type,
               doc_date: geminiData.doc_date,
               doc_year: geminiData.doc_year,
-              supplier_name: geminiData.supplier_name?.toUpperCase().trim() || null,
+              supplier_name: normalizeSupplierName(geminiData.supplier_name),
               supplier_vat: geminiData.supplier_vat,
               doc_number: geminiData.doc_number,
               total_amount: geminiData.total_amount,

@@ -76,7 +76,23 @@ export async function processInvoiceUpload(
     const base64Data = await fileToBase64(file);
     const geminiData: GeminiInvoiceData = await analyzeInvoiceWithGemini(base64Data, file.type);
 
+    // Normalizar nome do fornecedor
     geminiData.supplier_name = geminiData.supplier_name?.toUpperCase().trim() || null;
+
+    // Normalizações específicas de fornecedores
+    if (geminiData.supplier_name) {
+      if (geminiData.supplier_name.includes('INSTITUTO DOS REGISTOS') ||
+          geminiData.supplier_name.includes('NOTARIADO') ||
+          geminiData.supplier_name.includes('REGISTO PREDIAL')) {
+        geminiData.supplier_name = 'IRN';
+      } else if (geminiData.supplier_name.includes('PETRÓLEOS DE PORTUGAL') ||
+                 geminiData.supplier_name.includes('GALP ENERGIA')) {
+        geminiData.supplier_name = 'GALP';
+      } else if (geminiData.supplier_name.includes('NOS COMUNICAÇÕES') ||
+                 geminiData.supplier_name.includes('NOS SGPS')) {
+        geminiData.supplier_name = 'NOS';
+      }
+    }
 
     let isDuplicate = false;
 
