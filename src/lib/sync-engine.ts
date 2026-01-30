@@ -37,7 +37,7 @@ async function checkDuplicateInvoice(geminiData: GeminiInvoiceData): Promise<voi
   // Normalizar nome do fornecedor
   geminiData.supplier_name = geminiData.supplier_name?.toUpperCase().trim() || null;
 
-  // Verificar por doc_number primeiro (identificador único)
+  // VERIFICAÇÃO 1: Se tem doc_number, verificar se já existe fatura com MESMO doc_number
   if (geminiData.doc_number) {
     const { data: docDups } = await supabase
       .from('invoices')
@@ -49,24 +49,34 @@ async function checkDuplicateInvoice(geminiData: GeminiInvoiceData): Promise<voi
         `Fatura duplicada: ${geminiData.supplier_name} - ${geminiData.doc_date} (${geminiData.doc_number})`
       );
     }
+    // Se tem doc_number único, não é duplicado - sair aqui
+    return;
   }
 
-  // Verificar por combinação de campos
+  // VERIFICAÇÃO 2: Se não tem doc_number, verificar por fornecedor + data + valor + summary
+  // Isto evita falsos positivos quando há múltiplas faturas do mesmo fornecedor no mesmo dia
   const { data, error } = await supabase
     .from('invoices')
-    .select('id')
+    .select('id, summary')
     .ilike('supplier_name', geminiData.supplier_name || '')
     .eq('doc_date', geminiData.doc_date)
-    .eq('total_amount', geminiData.total_amount);
+    .eq('total_amount', geminiData.total_amount)
+    .is('doc_number', null);  // Só comparar com faturas que também não têm doc_number
 
   if (error) {
     throw error;
   }
 
+  // Só é duplicado se também tiver o mesmo summary (ou ambos vazios)
   if (data && data.length > 0) {
-    throw new DuplicateInvoiceError(
-      `Fatura duplicada: ${geminiData.supplier_name} - ${geminiData.doc_date} (${geminiData.doc_number || 'sem nº doc'})`
+    const summaryMatch = data.some(dup =>
+      (dup.summary || '').toLowerCase().trim() === (geminiData.summary || '').toLowerCase().trim()
     );
+    if (summaryMatch) {
+      throw new DuplicateInvoiceError(
+        `Fatura duplicada: ${geminiData.supplier_name} - ${geminiData.doc_date} (sem nº doc)`
+      );
+    }
   }
 }
 

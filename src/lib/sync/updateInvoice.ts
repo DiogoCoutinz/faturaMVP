@@ -60,19 +60,12 @@ export async function updateInvoiceEverywhere(
 ): Promise<UpdateInvoiceResult> {
   try {
     // PASSO 1: Obter dados atuais da fatura
-    // Tratar caso onde user_id pode ser null (faturas processadas automaticamente)
-    let fetchQuery = supabase
+    // Todos os utilizadores podem editar todas as faturas (sem filtro por user_id)
+    const { data: currentInvoice, error: fetchError } = await supabase
       .from('invoices')
       .select('*')
-      .eq('id', input.invoiceId);
-
-    if (input.userId) {
-      fetchQuery = fetchQuery.eq('user_id', input.userId);
-    } else {
-      fetchQuery = fetchQuery.is('user_id', null);
-    }
-
-    const { data: currentInvoice, error: fetchError } = await fetchQuery.single();
+      .eq('id', input.invoiceId)
+      .single();
 
     if (fetchError || !currentInvoice) {
       return {
@@ -86,19 +79,11 @@ export async function updateInvoiceEverywhere(
     }
 
     // PASSO 2: Atualizar no Supabase
-    // Mesma lógica para tratar user_id null
-    let updateQuery = supabase
+    // Todos os utilizadores podem editar todas as faturas (sem filtro por user_id)
+    const { data: updatedInvoice, error: updateError } = await supabase
       .from('invoices')
       .update(input.updates)
-      .eq('id', input.invoiceId);
-
-    if (input.userId) {
-      updateQuery = updateQuery.eq('user_id', input.userId);
-    } else {
-      updateQuery = updateQuery.is('user_id', null);
-    }
-
-    const { data: updatedInvoice, error: updateError } = await updateQuery
+      .eq('id', input.invoiceId)
       .select()
       .single();
 

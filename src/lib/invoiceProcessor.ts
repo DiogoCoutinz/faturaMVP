@@ -80,6 +80,7 @@ export async function processInvoiceUpload(
 
     let isDuplicate = false;
 
+    // VERIFICAÇÃO 1: Se tem doc_number, verificar se já existe fatura com MESMO doc_number
     if (geminiData.doc_number) {
       const { data: docDups } = await supabase
         .from('invoices')
@@ -88,14 +89,24 @@ export async function processInvoiceUpload(
       if (docDups && docDups.length > 0) isDuplicate = true;
     }
 
-    if (!isDuplicate) {
+    // VERIFICAÇÃO 2: Se não tem doc_number, verificar por fornecedor + data + valor + summary
+    // Isto evita falsos positivos quando há múltiplas faturas do mesmo fornecedor no mesmo dia
+    if (!isDuplicate && !geminiData.doc_number) {
       const { data: fieldDups } = await supabase
         .from('invoices')
-        .select('id')
+        .select('id, summary')
         .ilike('supplier_name', geminiData.supplier_name || '')
         .eq('doc_date', geminiData.doc_date)
-        .eq('total_amount', geminiData.total_amount);
-      if (fieldDups && fieldDups.length > 0) isDuplicate = true;
+        .eq('total_amount', geminiData.total_amount)
+        .is('doc_number', null);  // Só comparar com faturas que também não têm doc_number
+
+      // Só é duplicado se também tiver o mesmo summary (ou ambos vazios)
+      if (fieldDups && fieldDups.length > 0) {
+        const summaryMatch = fieldDups.some(dup =>
+          (dup.summary || '').toLowerCase().trim() === (geminiData.summary || '').toLowerCase().trim()
+        );
+        if (summaryMatch) isDuplicate = true;
+      }
     }
 
     if (isDuplicate) {

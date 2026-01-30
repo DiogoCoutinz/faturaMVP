@@ -111,20 +111,12 @@ export async function deleteInvoiceEverywhere(
   input: DeleteInvoiceInput
 ): Promise<DeleteInvoiceResult> {
   try {
-    // Query base - buscar por ID
-    let query = supabase
+    // Todos os utilizadores podem eliminar todas as faturas (sem filtro por user_id)
+    const { data: invoice, error: fetchError } = await supabase
       .from('invoices')
       .select('*')
-      .eq('id', input.invoiceId);
-
-    // Se user_id existe, adicionar filtro; senão, buscar onde user_id é null
-    if (input.userId) {
-      query = query.eq('user_id', input.userId);
-    } else {
-      query = query.is('user_id', null);
-    }
-
-    const { data: invoice, error: fetchError } = await query.single();
+      .eq('id', input.invoiceId)
+      .single();
 
     if (fetchError || !invoice) {
       return {
@@ -172,19 +164,11 @@ export async function deleteInvoiceEverywhere(
       );
     }
 
-    // Delete do Supabase - mesma lógica para user_id null
-    let deleteQuery = supabase
+    // Delete do Supabase - todos os utilizadores podem eliminar qualquer fatura
+    const { error: deleteError } = await supabase
       .from('invoices')
       .delete()
       .eq('id', input.invoiceId);
-
-    if (input.userId) {
-      deleteQuery = deleteQuery.eq('user_id', input.userId);
-    } else {
-      deleteQuery = deleteQuery.is('user_id', null);
-    }
-
-    const { error: deleteError } = await deleteQuery;
 
     if (deleteError) {
       return {

@@ -261,23 +261,35 @@ async function checkDuplicate(geminiData: GeminiInvoiceData): Promise<boolean> {
   // Normalizar nome
   geminiData.supplier_name = geminiData.supplier_name?.toUpperCase().trim() || null;
 
-  // Verificar por doc_number primeiro (identificador unico)
+  // VERIFICAÇÃO 1: Se tem doc_number, verificar se já existe fatura com MESMO doc_number
   if (geminiData.doc_number) {
     const { data: docDups } = await supabase
       .from("invoices")
       .select("id")
       .ilike("doc_number", geminiData.doc_number);
     if ((docDups?.length || 0) > 0) return true;
+    // Se tem doc_number único, não é duplicado
+    return false;
   }
 
-  // Verificar por combinacao de campos (case-insensitive)
+  // VERIFICAÇÃO 2: Se não tem doc_number, verificar por fornecedor + data + valor + summary
+  // Isto evita falsos positivos quando há múltiplas faturas do mesmo fornecedor no mesmo dia
   const { data } = await supabase
     .from("invoices")
-    .select("id")
+    .select("id, summary")
     .ilike("supplier_name", geminiData.supplier_name || "")
     .eq("doc_date", geminiData.doc_date)
-    .eq("total_amount", geminiData.total_amount);
-  return (data?.length || 0) > 0;
+    .eq("total_amount", geminiData.total_amount)
+    .is("doc_number", null);  // Só comparar com faturas que também não têm doc_number
+
+  // Só é duplicado se também tiver o mesmo summary (ou ambos vazios)
+  if ((data?.length || 0) > 0) {
+    const summaryMatch = data?.some(dup =>
+      (dup.summary || "").toLowerCase().trim() === (geminiData.summary || "").toLowerCase().trim()
+    );
+    return summaryMatch || false;
+  }
+  return false;
 }
 
 async function syncAccountEmails(
