@@ -8,7 +8,7 @@ import { findInvoiceRowIndex, getSheetNameFromDate } from './sheets-updater';
 
 export interface DeleteInvoiceInput {
   invoiceId: string;
-  userId: string;
+  userId: string | null;
   accessToken: string;
 }
 

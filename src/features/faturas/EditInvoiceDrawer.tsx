@@ -243,7 +243,7 @@ export function EditInvoiceDrawer({
 
       const result = await updateInvoiceEverywhere({
         invoiceId: invoice.id,
-        userId: user.id,
+        userId: invoice.user_id,  // Usar o user_id da fatura (pode ser null)
         accessToken: storageToken,
         updates,
       });

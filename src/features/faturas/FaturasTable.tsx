@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, MoreVertical, Eye, Download, ChevronUp, ChevronDown } from "lucide-react";
+import { ExternalLink, MoreVertical, Eye, Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,7 +18,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Invoice } from "@/types/database";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+const ITEMS_PER_PAGE = 20;
 
 interface FaturasTableProps {
   faturas: Invoice[];
@@ -31,6 +33,7 @@ type SortOrder = 'asc' | 'desc';
 export function FaturasTable({ faturas, onViewDetail }: FaturasTableProps) {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-PT", {
@@ -61,6 +64,17 @@ export function FaturasTable({ faturas, onViewDetail }: FaturasTableProps) {
     }
     return sortOrder === 'asc' ? comparison : -comparison;
   });
+
+  // Paginação
+  const totalPages = Math.ceil(sortedFaturas.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedFaturas = sortedFaturas.slice(startIndex, endIndex);
+
+  // Reset página quando os dados mudam
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [faturas.length, sortField, sortOrder]);
 
   const getValueColor = (tipo: string | null) => {
     if (tipo === "COMPRA") return "text-destructive";
@@ -125,14 +139,14 @@ export function FaturasTable({ faturas, onViewDetail }: FaturasTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedFaturas.length === 0 ? (
+          {paginatedFaturas.length === 0 ? (
             <TableRow>
               <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                 Nenhuma fatura encontrada.
               </TableCell>
             </TableRow>
           ) : (
-            sortedFaturas.map((fatura) => (
+            paginatedFaturas.map((fatura) => (
               <TableRow 
                 key={fatura.id} 
                 className="hover:bg-muted/30 transition-colors cursor-pointer group"
@@ -197,6 +211,58 @@ export function FaturasTable({ faturas, onViewDetail }: FaturasTableProps) {
           )}
         </TableBody>
       </Table>
+
+      {/* Paginação */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/30">
+          <div className="text-sm text-muted-foreground">
+            A mostrar {startIndex + 1}-{Math.min(endIndex, sortedFaturas.length)} de {sortedFaturas.length} faturas
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex items-center gap-1 px-2">
+              <span className="text-sm font-medium">{currentPage}</span>
+              <span className="text-sm text-muted-foreground">de</span>
+              <span className="text-sm font-medium">{totalPages}</span>
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

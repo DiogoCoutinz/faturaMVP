@@ -29,7 +29,7 @@ function getCostTypeFolderName(costType: string | null): string {
 
 export interface UpdateInvoiceInput {
   invoiceId: string;
-  userId: string;
+  userId: string | null;
   accessToken: string;
   updates: {
     supplier_name?: string;
@@ -60,12 +60,19 @@ export async function updateInvoiceEverywhere(
 ): Promise<UpdateInvoiceResult> {
   try {
     // PASSO 1: Obter dados atuais da fatura
-    const { data: currentInvoice, error: fetchError } = await supabase
+    // Tratar caso onde user_id pode ser null (faturas processadas automaticamente)
+    let fetchQuery = supabase
       .from('invoices')
       .select('*')
-      .eq('id', input.invoiceId)
-      .eq('user_id', input.userId)
-      .single();
+      .eq('id', input.invoiceId);
+
+    if (input.userId) {
+      fetchQuery = fetchQuery.eq('user_id', input.userId);
+    } else {
+      fetchQuery = fetchQuery.is('user_id', null);
+    }
+
+    const { data: currentInvoice, error: fetchError } = await fetchQuery.single();
 
     if (fetchError || !currentInvoice) {
       return {
@@ -79,11 +86,19 @@ export async function updateInvoiceEverywhere(
     }
 
     // PASSO 2: Atualizar no Supabase
-    const { data: updatedInvoice, error: updateError } = await supabase
+    // Mesma lógica para tratar user_id null
+    let updateQuery = supabase
       .from('invoices')
       .update(input.updates)
-      .eq('id', input.invoiceId)
-      .eq('user_id', input.userId)
+      .eq('id', input.invoiceId);
+
+    if (input.userId) {
+      updateQuery = updateQuery.eq('user_id', input.userId);
+    } else {
+      updateQuery = updateQuery.is('user_id', null);
+    }
+
+    const { data: updatedInvoice, error: updateError } = await updateQuery
       .select()
       .single();
 
