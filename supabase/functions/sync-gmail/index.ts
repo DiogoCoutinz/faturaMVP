@@ -191,7 +191,20 @@ async function markEmailAsRead(accessToken: string, messageId: string): Promise<
   });
 }
 
-const GEMINI_PROMPT = "Atua como contabilista. Extrai dados de faturas. supplier_name deve ser nome curto e limpo SEMPRE EM MAIUSCULAS (ex: GALP, FIDELIDADE, WORTEN). cost_type: custo_fixo para despesas recorrentes (seguros, rendas, telecomunicacoes, software), custo_variavel para pontuais (refeicoes, combustivel, material). Responde APENAS com JSON: {is_valid_document: boolean, document_type: fatura|recibo|outro|null, cost_type: custo_fixo|custo_variavel|null, doc_year: number|null, doc_date: YYYY-MM-DD|null, supplier_name: string|null, supplier_vat: string|null, doc_number: string|null, total_amount: number|null, summary: string|null, confidence_score: number}";
+const GEMINI_PROMPT = `Atua como contabilista. Extrai dados de faturas.
+
+REGRAS CRITICAS:
+- supplier_name: Nome curto e limpo SEMPRE EM MAIUSCULAS
+- NORMALIZACOES OBRIGATORIAS: "Instituto dos Registos e do Notariado" = "IRN", "Petroleos de Portugal" = "GALP", "NOS Comunicacoes" = "NOS"
+- cost_type: custo_fixo (seguros, rendas, telecomunicacoes, software) ou custo_variavel (refeicoes, combustivel, material, certidoes)
+
+CASO ESPECIAL IRN (Registo Predial Online):
+- supplier_name: SEMPRE "IRN" (nunca nome completo)
+- doc_number: Usar numero do "Pedido" (ex: campo "Pedido: 1097412026 / 2026-01-09" = doc_number "1097412026")
+- doc_date: Data do pedido (YYYY-MM-DD)
+- cost_type: "custo_variavel"
+
+Responde APENAS com JSON: {is_valid_document: boolean, document_type: fatura|recibo|outro|null, cost_type: custo_fixo|custo_variavel|null, doc_year: number|null, doc_date: YYYY-MM-DD|null, supplier_name: string|null, supplier_vat: string|null, doc_number: string|null, total_amount: number|null, summary: string|null, confidence_score: number}`;
 
 async function analyzeWithGemini(pdfBase64: string, mimeType: string): Promise<GeminiInvoiceData> {
   const response = await fetch(

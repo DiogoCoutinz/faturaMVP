@@ -55,6 +55,22 @@ Antes de tudo, verifica se a imagem/documento é realmente uma FATURA, RECIBO ou
 - total_amount: Valor total com impostos. Usa ponto para decimais (ex: 12.50). Nunca uses vírgulas.
 - summary: Resumo telegráfico (Max 5 palavras). Ex: "Almoço cliente Braga" ou "Subscrição Canva".
 
+# NORMALIZAÇÕES DE FORNECEDORES (CRÍTICO)
+Usa SEMPRE estes nomes curtos:
+- "Instituto dos Registos e do Notariado" ou "IRN" ou variações → supplier_name: "IRN"
+- "Petróleos de Portugal" ou "Galp Energia" → supplier_name: "GALP"
+- "NOS Comunicações" ou "NOS SGPS" → supplier_name: "NOS"
+- "Vodafone Portugal" → supplier_name: "VODAFONE"
+- "MEO - Serviços de Comunicações" → supplier_name: "MEO"
+
+# CASOS ESPECIAIS - DOCUMENTOS IRN (Registo Predial Online)
+Para documentos do IRN (Pedidos de Certidão Permanente, Informação Predial, etc.):
+- supplier_name: SEMPRE "IRN" (nunca "INSTITUTO DOS REGISTOS E DO NOTARIADO")
+- doc_number: Usar o número do "Pedido" (ex: "1097412026" do campo "Pedido: 1097412026 / 2026-01-09")
+- doc_date: Data do pedido (ex: "2026-01-09" do campo "Pedido: 1097412026 / 2026-01-09 17:44:40")
+- total_amount: Valor do TOTAL (normalmente 15€ ou 1€)
+- summary: Incluir localização se disponível (ex: "Certidão Permanente Coimbra")
+
 # OUTPUT FORMAT (JSON ONLY)
 Deves responder APENAS com este objeto JSON, sem markdown, sem texto antes ou depois:
 
