@@ -28,14 +28,91 @@ interface FornecedorStats {
 interface AppSidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
+  isMobile?: boolean;
+  isMobileMenuOpen?: boolean;
 }
 
-export function AppSidebar({ isCollapsed, onToggle }: AppSidebarProps) {
+export function AppSidebar({ isCollapsed, onToggle, isMobile, isMobileMenuOpen }: AppSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
   const currentFornecedor = searchParams.get("fornecedor");
+
+  // Mobile: show as overlay menu, Desktop: show as sidebar
+  if (isMobile) {
+    return (
+      <>
+        {/* Mobile Header Bar */}
+        <header className="fixed top-0 left-0 right-0 z-30 h-14 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg gradient-primary">
+              <Building2 className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <span className="text-sm font-bold text-sidebar-accent-foreground">FaturaAI</span>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggle}
+            className="text-sidebar-foreground hover:bg-sidebar-accent"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </header>
+
+        {/* Mobile Menu Overlay */}
+        <aside className={cn(
+          "fixed left-0 top-14 z-40 h-[calc(100vh-3.5rem)] w-64 bg-sidebar border-r border-sidebar-border flex flex-col transition-transform duration-300 ease-in-out",
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
+          {/* Navigation */}
+          <nav className="space-y-1 px-3 py-4 shrink-0">
+            {navigation.map((item) => {
+              const isActive = location.pathname === item.href && !currentFornecedor;
+              return (
+                <NavLink
+                  key={item.name}
+                  to={item.href}
+                  onClick={onToggle}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                    isActive
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-md"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  )}
+                >
+                  <item.icon className="h-5 w-5 shrink-0" />
+                  <span>{item.name}</span>
+                </NavLink>
+              );
+            })}
+          </nav>
+
+          <ScrollArea className="flex-1 px-3 border-t border-sidebar-border pt-4" />
+
+          {/* Footer */}
+          <div className="border-t border-sidebar-border p-4 shrink-0">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                localStorage.removeItem('faturasai_logged_in');
+                localStorage.removeItem('faturasai_user');
+                navigate('/login');
+              }}
+              className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive"
+            >
+              <LogOut className="h-4 w-4" />
+              Sair
+            </Button>
+          </div>
+        </aside>
+
+        {/* Spacer for fixed header */}
+        <div className="h-14" />
+      </>
+    );
+  }
 
   return (
     <aside className={cn(

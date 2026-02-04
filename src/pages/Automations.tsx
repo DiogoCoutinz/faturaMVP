@@ -277,14 +277,14 @@ export default function AutomationsPage() {
     <AppLayout>
       <div className="space-y-6 max-w-4xl">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              <Zap className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <Zap className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
               Automações
             </h1>
-            <p className="mt-1 text-muted-foreground">
-              Sincronização automática de faturas do Gmail (últimas 24h)
+            <p className="mt-1 text-sm sm:text-base text-muted-foreground">
+              Sincronização automática de faturas do Gmail
             </p>
           </div>
           <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
@@ -295,17 +295,17 @@ export default function AutomationsPage() {
         {/* Contas Conectadas */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                   <Users className="h-5 w-5" />
                   Contas Conectadas
                 </CardTitle>
-                <CardDescription>
-                  Contas Gmail que serão verificadas. A conta com <Star className="h-3 w-3 inline" /> guarda os ficheiros no Drive/Sheets.
+                <CardDescription className="text-xs sm:text-sm">
+                  Contas Gmail que serão verificadas. A conta com <Star className="h-3 w-3 inline" /> guarda os ficheiros.
                 </CardDescription>
               </div>
-              <Button onClick={handleAddAccount} disabled={addingAccount} className="gap-2">
+              <Button onClick={handleAddAccount} disabled={addingAccount} className="gap-2 w-full sm:w-auto">
                 <Plus className="h-4 w-4" />
                 Adicionar Conta
               </Button>
@@ -340,7 +340,7 @@ export default function AutomationsPage() {
                   return (
                     <div
                       key={acc.id}
-                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                      className={`p-3 rounded-lg border ${
                         needsReauth
                           ? 'bg-red-50 border-red-200'
                           : acc.is_primary_storage
@@ -348,8 +348,8 @@ export default function AutomationsPage() {
                             : 'bg-background'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                      <div className="flex items-start gap-3">
+                        <div className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${
                           needsReauth
                             ? 'bg-red-100'
                             : acc.is_primary_storage
@@ -358,25 +358,25 @@ export default function AutomationsPage() {
                         }`}>
                           <Mail className={`h-5 w-5 ${needsReauth ? 'text-red-600' : 'text-primary'}`} />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium">{acc.email}</p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                            <p className="font-medium text-sm sm:text-base truncate">{acc.email}</p>
                             {acc.is_primary_storage && (
-                              <Badge className="bg-primary/20 text-primary border-primary/30 gap-1">
+                              <Badge className="bg-primary/20 text-primary border-primary/30 gap-1 text-xs">
                                 <Star className="h-3 w-3" />
-                                Armazenamento
+                                <span className="hidden sm:inline">Armazenamento</span>
                               </Badge>
                             )}
                             {needsReauth && (
-                              <Badge variant="destructive" className="gap-1">
+                              <Badge variant="destructive" className="gap-1 text-xs">
                                 <AlertCircle className="h-3 w-3" />
-                                Re-autenticar
+                                <span className="hidden sm:inline">Re-autenticar</span>
                               </Badge>
                             )}
                             {hasRefresh && (
-                              <Badge className="bg-green-100 text-green-700 border-green-300 gap-1">
+                              <Badge className="bg-green-100 text-green-700 border-green-300 gap-1 text-xs">
                                 <CheckCircle2 className="h-3 w-3" />
-                                Renova auto
+                                <span className="hidden sm:inline">Auto</span>
                               </Badge>
                             )}
                           </div>
@@ -384,22 +384,23 @@ export default function AutomationsPage() {
                             {hasRefresh
                               ? 'Token renova automaticamente'
                               : expired
-                                ? `Token expirou em: ${new Date(acc.token_expiry).toLocaleString('pt-PT')}`
-                                : `Token expira: ${new Date(acc.token_expiry).toLocaleString('pt-PT')}`
+                                ? `Expirou: ${new Date(acc.token_expiry).toLocaleDateString('pt-PT')}`
+                                : `Expira: ${new Date(acc.token_expiry).toLocaleDateString('pt-PT')}`
                             }
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
+                      {/* Actions row for mobile */}
+                      <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-border/50">
                         {needsReauth && (
                           <Button
                             variant="outline"
                             size="sm"
-                            className="text-red-600 border-red-300 hover:bg-red-50 gap-1"
+                            className="text-red-600 border-red-300 hover:bg-red-50 gap-1 flex-1 sm:flex-none"
                             onClick={() => handleReauthAccount(acc.email)}
                           >
                             <LogIn className="h-4 w-4" />
-                            Re-autenticar
+                            <span className="sm:inline">Re-autenticar</span>
                           </Button>
                         )}
                         {!acc.is_primary_storage && !needsReauth && (
@@ -459,30 +460,32 @@ export default function AutomationsPage() {
                 {syncLogs.map((log) => (
                   <div
                     key={log.id}
-                    className="flex items-center justify-between p-3 rounded-lg border bg-background"
+                    className="p-3 rounded-lg border bg-background"
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        {getStatusBadge(log.status)}
-                        <span className="text-xs text-muted-foreground">
-                          {log.metadata?.email || 'Sistema'}
-                        </span>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {getStatusBadge(log.status)}
+                          <span className="text-xs text-muted-foreground">
+                            {log.metadata?.email || 'Sistema'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(log.started_at).toLocaleString('pt-PT')}
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(log.started_at).toLocaleString('pt-PT')}
-                      </p>
-                    </div>
-                    <div className="text-right text-sm">
-                      <div className="flex items-center gap-3">
-                        <span className="text-green-600 font-medium">
-                          {log.processed_count} novas
-                        </span>
-                        {log.duplicate_count > 0 && (
-                          <span className="text-yellow-600">{log.duplicate_count} dup</span>
-                        )}
-                        {log.error_count > 0 && (
-                          <span className="text-red-600">{log.error_count} erros</span>
-                        )}
+                      <div className="text-right text-xs sm:text-sm shrink-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                          <span className="text-green-600 font-medium">
+                            {log.processed_count} novas
+                          </span>
+                          {log.duplicate_count > 0 && (
+                            <span className="text-yellow-600">{log.duplicate_count} dup</span>
+                          )}
+                          {log.error_count > 0 && (
+                            <span className="text-red-600">{log.error_count} erros</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -300,10 +300,10 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
   if (isReviewMode && open && !isEditing) {
     return (
       <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <DialogContent className="max-w-[95vw] w-[1400px] h-[85vh] p-0 gap-0 flex flex-col">
-          <div className="flex flex-1 min-h-0">
-            {/* ESQUERDA - PDF Preview */}
-            <div className="flex-1 bg-muted/30 border-r min-h-0">
+        <DialogContent className="max-w-[95vw] w-full md:w-[1400px] h-[90vh] md:h-[85vh] p-0 gap-0 flex flex-col">
+          <div className="flex flex-col md:flex-row flex-1 min-h-0">
+            {/* ESQUERDA - PDF Preview (hidden on mobile, or collapsible) */}
+            <div className="hidden md:flex flex-1 bg-muted/30 border-r min-h-0">
               {pdfPreviewUrl ? (
                 <iframe
                   src={pdfPreviewUrl}
@@ -319,15 +319,27 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
             </div>
 
             {/* DIREITA - Dados da Fatura */}
-            <div className="w-[400px] flex flex-col min-h-0">
+            <div className="w-full md:w-[400px] flex flex-col min-h-0 flex-1 md:flex-none">
               <DialogHeader className="p-4 pb-3 border-b shrink-0">
                 <div className="flex items-center justify-between">
-                  <DialogTitle className="text-lg">Rever Fatura</DialogTitle>
+                  <DialogTitle className="text-base sm:text-lg">Rever Fatura</DialogTitle>
                   <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
                     A Rever
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">{fatura.supplier_name}</p>
+                <p className="text-sm text-muted-foreground truncate">{fatura.supplier_name}</p>
+                {/* Mobile: Link to open PDF */}
+                {pdfPreviewUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="md:hidden mt-2 gap-2"
+                    onClick={() => window.open(fatura.drive_link || pdfPreviewUrl, "_blank")}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Ver PDF
+                  </Button>
+                )}
               </DialogHeader>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
@@ -405,10 +417,10 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
   if (isEditing) {
     return (
       <Dialog open={isEditing} onOpenChange={(open) => !open && handleCancelEdit()}>
-        <DialogContent className="max-w-[95vw] w-[1400px] h-[85vh] p-0 gap-0 flex flex-col">
-          <div className="flex flex-1 min-h-0">
-            {/* ESQUERDA - PDF Preview */}
-            <div className="flex-1 bg-muted/30 border-r min-h-0">
+        <DialogContent className="max-w-[95vw] w-full md:w-[1400px] h-[90vh] md:h-[85vh] p-0 gap-0 flex flex-col">
+          <div className="flex flex-col md:flex-row flex-1 min-h-0">
+            {/* ESQUERDA - PDF Preview (hidden on mobile) */}
+            <div className="hidden md:flex flex-1 bg-muted/30 border-r min-h-0">
               {pdfPreviewUrl ? (
                 <iframe
                   src={pdfPreviewUrl}
@@ -424,10 +436,22 @@ export function FaturaDetailDrawer({ fatura, open, onClose }: FaturaDetailDrawer
             </div>
 
             {/* DIREITA - Formulário */}
-            <div className="w-[400px] flex flex-col min-h-0">
+            <div className="w-full md:w-[400px] flex flex-col min-h-0 flex-1 md:flex-none">
               <DialogHeader className="p-4 pb-3 border-b shrink-0">
-                <DialogTitle className="text-lg">Editar Fatura</DialogTitle>
-                <p className="text-sm text-muted-foreground">{fatura.supplier_name}</p>
+                <DialogTitle className="text-base sm:text-lg">Editar Fatura</DialogTitle>
+                <p className="text-sm text-muted-foreground truncate">{fatura.supplier_name}</p>
+                {/* Mobile: Link to open PDF */}
+                {pdfPreviewUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="md:hidden mt-2 gap-2"
+                    onClick={() => window.open(fatura.drive_link || pdfPreviewUrl, "_blank")}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Ver PDF
+                  </Button>
+                )}
               </DialogHeader>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-0">

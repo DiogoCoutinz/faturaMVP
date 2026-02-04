@@ -221,47 +221,49 @@ export function TrendsChart({ data, dateFilter, onDateFilterChange }: TrendsChar
       {/* Executive accent */}
       <div className="h-1 w-full bg-gradient-to-r from-primary/0 via-primary/50 to-primary/0"></div>
       
-      <CardHeader className="flex flex-col gap-5 pb-5 pt-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <CardHeader className="flex flex-col gap-4 pb-4 pt-5">
+        <div className="flex flex-col gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="h-1 w-8 bg-primary rounded-full"></div>
-              <CardTitle className="text-base font-semibold text-foreground">
+              <CardTitle className="text-sm sm:text-base font-semibold text-foreground">
                 Análise de Gastos
               </CardTitle>
             </div>
             <p className="text-xs text-muted-foreground ml-10">Evolução temporal dos custos</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)} className="w-[200px]">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+            <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)} className="w-full sm:w-[200px]">
               <TabsList className="grid w-full grid-cols-4 h-9 bg-muted/50">
-                <TabsTrigger value="day" className="text-xs px-2 transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Dia</TabsTrigger>
-                <TabsTrigger value="week" className="text-xs px-2 transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Sem</TabsTrigger>
-                <TabsTrigger value="month" className="text-xs px-2 transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Mês</TabsTrigger>
-                <TabsTrigger value="year" className="text-xs px-2 transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Ano</TabsTrigger>
+                <TabsTrigger value="day" className="text-xs px-1 sm:px-2 transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Dia</TabsTrigger>
+                <TabsTrigger value="week" className="text-xs px-1 sm:px-2 transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Sem</TabsTrigger>
+                <TabsTrigger value="month" className="text-xs px-1 sm:px-2 transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Mês</TabsTrigger>
+                <TabsTrigger value="year" className="text-xs px-1 sm:px-2 transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm">Ano</TabsTrigger>
               </TabsList>
             </Tabs>
 
-            <Select value={costType} onValueChange={(v) => setCostType(v as CostType)}>
-              <SelectTrigger className="w-[140px] h-9 text-sm transition-all duration-300 hover:border-primary/50 focus:border-primary">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="fixo">Custos Fixos</SelectItem>
-                <SelectItem value="variavel">Custos Var.</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select value={costType} onValueChange={(v) => setCostType(v as CostType)}>
+                <SelectTrigger className="flex-1 sm:w-[140px] h-9 text-sm transition-all duration-300 hover:border-primary/50 focus:border-primary">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="fixo">Custos Fixos</SelectItem>
+                  <SelectItem value="variavel">Custos Var.</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Button
-              variant={showDateFilter ? "default" : "outline"}
-              size="sm"
-              className="h-9 gap-1.5 transition-all duration-300 hover:scale-105"
-              onClick={() => setShowDateFilter(!showDateFilter)}
-            >
-              <CalendarDays className="h-4 w-4 transition-transform duration-300 group-hover/card:rotate-12" />
-              <span className="text-sm">Datas</span>
-            </Button>
+              <Button
+                variant={showDateFilter ? "default" : "outline"}
+                size="sm"
+                className="h-9 gap-1.5 transition-all duration-300 hover:scale-105"
+                onClick={() => setShowDateFilter(!showDateFilter)}
+              >
+                <CalendarDays className="h-4 w-4 transition-transform duration-300 group-hover/card:rotate-12" />
+                <span className="text-sm hidden sm:inline">Datas</span>
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -301,7 +303,7 @@ export function TrendsChart({ data, dateFilter, onDateFilterChange }: TrendsChar
         )}
       </CardHeader>
       <CardContent>
-        <div className="h-[350px] w-full pt-4">
+        <div className="h-[280px] sm:h-[350px] w-full pt-4">
           {filteredData.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-foreground">
               <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">

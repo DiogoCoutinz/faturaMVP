@@ -1,16 +1,16 @@
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, MoreVertical, Eye, Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { ExternalLink, MoreVertical, Eye, Download, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronRightIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Invoice } from "@/types/database";
 import { useState, useEffect } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -31,6 +32,7 @@ type SortField = 'date' | 'amount' | 'supplier';
 type SortOrder = 'asc' | 'desc';
 
 export function FaturasTable({ faturas, onViewDetail }: FaturasTableProps) {
+  const isMobile = useIsMobile();
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [currentPage, setCurrentPage] = useState(1);
@@ -103,6 +105,90 @@ export function FaturasTable({ faturas, onViewDetail }: FaturasTableProps) {
     return sortOrder === 'asc' ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />;
   };
 
+  // Mobile Card View
+  if (isMobile) {
+    return (
+      <div className="space-y-3">
+        {paginatedFaturas.length === 0 ? (
+          <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
+            Nenhuma fatura encontrada.
+          </div>
+        ) : (
+          <>
+            {paginatedFaturas.map((fatura) => (
+              <div
+                key={fatura.id}
+                onClick={() => onViewDetail(fatura)}
+                className="rounded-xl border border-border bg-card p-4 shadow-sm active:bg-muted/50 transition-colors cursor-pointer"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-foreground truncate">
+                        {fatura.supplier_name}
+                      </span>
+                      {fatura.status === 'review' && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-300 bg-amber-50 text-amber-700 shrink-0">
+                          A rever
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>
+                        {fatura.doc_date ? format(new Date(fatura.doc_date), "dd/MM/yyyy", { locale: pt }) : "—"}
+                      </span>
+                      <span>·</span>
+                      <Badge variant="outline" className={`text-xs font-normal ${getCategoryBadgeStyle(fatura.cost_type)}`}>
+                        {getCategoryLabel(fatura.cost_type)}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-lg font-bold ${getValueColor(fatura.document_type)}`}>
+                      {formatCurrency(Number(fatura.total_amount) || 0)}
+                    </span>
+                    <ChevronRightIcon className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Mobile Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-sm text-muted-foreground">
+                  {startIndex + 1}-{Math.min(endIndex, sortedFaturas.length)} de {sortedFaturas.length}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="px-3 text-sm font-medium">{currentPage}/{totalPages}</span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop Table View
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
       <Table>

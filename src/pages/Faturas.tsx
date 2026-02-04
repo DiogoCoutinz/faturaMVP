@@ -82,7 +82,7 @@ export default function Faturas() {
       <div className="space-y-6">
         {/* Header */}
         <div className="animate-fade-in">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
             {fornecedorFromUrl
               ? fornecedorFromUrl
               : statusFromUrl === "review"
@@ -90,7 +90,7 @@ export default function Faturas() {
               : "Faturas"
             }
           </h1>
-          <p className="mt-1 text-muted-foreground">
+          <p className="mt-1 text-sm sm:text-base text-muted-foreground">
             {fornecedorFromUrl
               ? `Faturas de ${fornecedorFromUrl}`
               : statusFromUrl === "review"
@@ -134,10 +134,10 @@ export default function Faturas() {
         )}
 
         {/* Results count & Actions */}
-        <div className="flex items-center justify-between animate-fade-in" style={{ animationDelay: "100ms" }}>
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in" style={{ animationDelay: "100ms" }}>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
             <p className="text-sm text-muted-foreground">
-              {isLoading ? "A carregar..." : `${documentos?.length || 0} ${(documentos?.length || 0) === 1 ? "resultado" : "resultados"} encontrados`}
+              {isLoading ? "A carregar..." : `${documentos?.length || 0} ${(documentos?.length || 0) === 1 ? "resultado" : "resultados"}`}
             </p>
             {documentos && documentos.length > 0 && (
               <p className="text-sm font-semibold text-foreground">
@@ -153,31 +153,31 @@ export default function Faturas() {
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 border-green-500/20 hover:bg-green-500/5 text-green-700"
+                className="flex-1 sm:flex-none gap-2 border-green-500/20 hover:bg-green-500/5 text-green-700"
                 onClick={() => {
                   const csvName = `faturas_${selectedAno !== 'all' ? selectedAno : 'total'}${selectedMes !== 'all' ? '_' + selectedMes : ''}.csv`;
                   exportInvoicesToCSV(documentos, csvName);
                 }}
               >
                 <FileSpreadsheet className="h-4 w-4" />
-                CSV
+                <span className="hidden sm:inline">CSV</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 border-primary/20 hover:bg-primary/5 text-primary"
+                className="flex-1 sm:flex-none gap-2 border-primary/20 hover:bg-primary/5 text-primary"
                 onClick={handleExportZip}
                 disabled={isExporting}
               >
                 {isExporting ? (
                   <>
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    A exportar...
+                    <span className="hidden sm:inline">A exportar...</span>
                   </>
                 ) : (
                   <>
                     <FileArchive className="h-4 w-4" />
-                    ZIP
+                    <span className="hidden sm:inline">ZIP</span>
                   </>
                 )}
               </Button>

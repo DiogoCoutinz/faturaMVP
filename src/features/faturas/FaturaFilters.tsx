@@ -55,8 +55,9 @@ export function FaturaFilters({
   anos,
 }: FaturaFiltersProps) {
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-      <div className="relative flex-1">
+    <div className="space-y-3">
+      {/* Search */}
+      <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Pesquisar por fornecedor..."
@@ -65,14 +66,16 @@ export function FaturaFilters({
           className="pl-10 bg-card border-border"
         />
       </div>
-      <div className="flex flex-wrap gap-3">
+
+      {/* Filters Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Select value={selectedAno} onValueChange={onAnoChange}>
-          <SelectTrigger className="w-[120px] bg-card border-border">
-            <Calendar className="mr-2 h-4 w-4 text-muted-foreground" />
+          <SelectTrigger className="w-full bg-card border-border">
+            <Calendar className="mr-1.5 h-4 w-4 text-muted-foreground shrink-0" />
             <SelectValue placeholder="Ano" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos os anos</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
             {anos.map((ano) => (
               <SelectItem key={ano} value={ano.toString()}>
                 {ano}
@@ -82,11 +85,11 @@ export function FaturaFilters({
         </Select>
 
         <Select value={selectedMes} onValueChange={onMesChange}>
-          <SelectTrigger className="w-[140px] bg-card border-border">
+          <SelectTrigger className="w-full bg-card border-border">
             <SelectValue placeholder="Mês" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos os meses</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
             {MESES.map((mes) => (
               <SelectItem key={mes.value} value={mes.value}>
                 {mes.label}
@@ -96,12 +99,12 @@ export function FaturaFilters({
         </Select>
 
         <Select value={selectedCategoria} onValueChange={onCategoriaChange}>
-          <SelectTrigger className="w-[180px] bg-card border-border">
-            <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+          <SelectTrigger className="w-full bg-card border-border">
+            <Filter className="mr-1.5 h-4 w-4 text-muted-foreground shrink-0" />
             <SelectValue placeholder="Categoria" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas as categorias</SelectItem>
+            <SelectItem value="all">Todas</SelectItem>
             {categorias.map((cat) => (
               <SelectItem key={cat} value={cat}>
                 {cat}
@@ -111,11 +114,11 @@ export function FaturaFilters({
         </Select>
 
         <Select value={selectedTipo} onValueChange={onTipoChange}>
-          <SelectTrigger className="w-[140px] bg-card border-border">
+          <SelectTrigger className="w-full bg-card border-border">
             <SelectValue placeholder="Tipo" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos os tipos</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
             {tipos.map((tipo) => (
               <SelectItem key={tipo} value={tipo}>
                 {tipo}

@@ -52,11 +52,11 @@ export default function Dashboard() {
     <AppLayout>
       <div className="space-y-12 animate-fade-in pb-8">
         {/* Header */}
-        <div className="animate-fade-in-up flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+        <div className="animate-fade-in-up flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
             Dashboard Financeiro
           </h1>
-          <span className="text-4xl font-extrabold tracking-tight text-primary">
+          <span className="text-2xl sm:text-4xl font-extrabold tracking-tight text-primary">
             FaturaAI
           </span>
         </div>

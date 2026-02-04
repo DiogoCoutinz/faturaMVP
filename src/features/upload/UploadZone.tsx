@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileText, Loader2, CheckCircle2, XCircle, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Upload, FileText, Loader2, CheckCircle2, XCircle, AlertTriangle, AlertCircle, RefreshCw, Camera, FolderOpen, Info } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -9,6 +9,7 @@ import { useAuth } from '@/features/auth/AuthContext';
 import { supabase } from '@/lib/supabase/client';
 import { Link } from 'react-router-dom';
 import type { Invoice } from '@/types/database';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface FileUploadStatus {
   file: File;
@@ -28,14 +29,18 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 export function UploadZone() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [fileStatuses, setFileStatuses] = useState<FileUploadStatus[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [storageAccount, setStorageAccount] = useState<StorageAccount | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [showCameraWarning, setShowCameraWarning] = useState(false);
   const abortRef = useRef(false);
   const processingRef = useRef(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Função para buscar e renovar token se necessário
   const fetchAndRefreshToken = useCallback(async () => {
@@ -215,6 +220,27 @@ export function UploadZone() {
     disabled: isProcessing || isLoading,
   });
 
+  // Handle file input change (for mobile buttons)
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      onDrop(Array.from(files));
+    }
+    // Reset input
+    e.target.value = '';
+  };
+
+  // Handle camera button click
+  const handleCameraClick = () => {
+    setShowCameraWarning(true);
+  };
+
+  // Confirm camera use and open camera
+  const confirmCameraUse = () => {
+    setShowCameraWarning(false);
+    cameraInputRef.current?.click();
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-PT', {
       style: 'currency',
@@ -324,6 +350,65 @@ export function UploadZone() {
         </Card>
       )}
 
+      {/* Camera Warning Modal */}
+      {showCameraWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-sm animate-scale-in">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-amber-600">
+                <Info className="h-5 w-5" />
+                Dica de Qualidade
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p>Para melhores resultados ao tirar foto da fatura:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>Boa iluminacao (sem sombras)</li>
+                  <li>Fatura bem enquadrada</li>
+                  <li>Texto legivel e focado</li>
+                  <li>Evitar reflexos</li>
+                </ul>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowCameraWarning(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={confirmCameraUse}
+                >
+                  <Camera className="h-4 w-4" />
+                  Tirar Foto
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Hidden inputs for mobile */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,application/pdf"
+        multiple
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+
       {/* DRAG & DROP ZONE */}
       <Card>
         <CardHeader>
@@ -332,16 +417,43 @@ export function UploadZone() {
             Upload de Faturas
           </CardTitle>
           <CardDescription>
-            Arraste ficheiros ou clique para selecionar (até {MAX_FILES} ficheiros, JPG/PNG/PDF, max 10MB cada)
+            {isMobile
+              ? `Tire foto ou selecione ficheiros (até ${MAX_FILES}, max 10MB)`
+              : `Arraste ficheiros ou clique para selecionar (até ${MAX_FILES} ficheiros, JPG/PNG/PDF, max 10MB cada)`
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Mobile: Show buttons instead of drag zone */}
+          {isMobile && fileStatuses.length === 0 && !isProcessing && (
+            <div className="space-y-3 mb-4">
+              <Button
+                className="w-full h-14 gap-3 text-base"
+                onClick={handleCameraClick}
+                disabled={isLoading || !storageAccount}
+              >
+                <Camera className="h-5 w-5" />
+                Tirar Foto da Fatura
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full h-14 gap-3 text-base"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading || !storageAccount}
+              >
+                <FolderOpen className="h-5 w-5" />
+                Escolher Ficheiro
+              </Button>
+            </div>
+          )}
+
           <div
             {...getRootProps()}
             className={`
-              border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-all
+              border-2 border-dashed rounded-lg p-8 sm:p-12 text-center cursor-pointer transition-all
               ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
               ${isProcessing || isLoading ? 'opacity-50 cursor-not-allowed' : ''}
+              ${isMobile && fileStatuses.length === 0 ? 'hidden' : ''}
             `}
           >
             <input {...getInputProps()} />
@@ -354,7 +466,7 @@ export function UploadZone() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-lg font-medium text-foreground">
+                  <p className="text-base sm:text-lg font-medium text-foreground">
                     {isDragActive ? 'Solte os ficheiros aqui' : 'Arraste faturas ou clique para selecionar'}
                   </p>
                   <p className="text-sm text-muted-foreground mt-2">
