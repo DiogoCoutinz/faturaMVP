@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/features/auth/AuthContext";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -36,8 +37,14 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, isMobileMenuOpen }
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  
+  const { signOut } = useAuth();
+
   const currentFornecedor = searchParams.get("fornecedor");
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   // Mobile: show as overlay menu, Desktop: show as sidebar
   if (isMobile) {
@@ -95,11 +102,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, isMobileMenuOpen }
           <div className="border-t border-sidebar-border p-4 shrink-0">
             <Button
               variant="ghost"
-              onClick={() => {
-                localStorage.removeItem('faturasai_logged_in');
-                localStorage.removeItem('faturasai_user');
-                navigate('/login');
-              }}
+              onClick={handleLogout}
               className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive"
             >
               <LogOut className="h-4 w-4" />
@@ -188,11 +191,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, isMobileMenuOpen }
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => {
-              localStorage.removeItem('faturasai_logged_in');
-              localStorage.removeItem('faturasai_user');
-              navigate('/login');
-            }}
+            onClick={handleLogout}
             className="w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive"
             title="Sair"
           >
@@ -202,11 +201,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, isMobileMenuOpen }
           <div className="space-y-3 animate-fade-in">
             <Button
               variant="ghost"
-              onClick={() => {
-                localStorage.removeItem('faturasai_logged_in');
-                localStorage.removeItem('faturasai_user');
-                navigate('/login');
-              }}
+              onClick={handleLogout}
               className="w-full justify-start gap-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-destructive"
             >
               <LogOut className="h-4 w-4" />

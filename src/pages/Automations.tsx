@@ -133,69 +133,49 @@ export default function AutomationsPage() {
   const handleRemoveAccount = async (accountId: string, email: string) => {
     if (!confirm(`Remover a conta ${email}? Isto revoga o acesso no Google e força nova autorização com permissões atualizadas.`)) return;
 
-    console.log('=== REMOVER CONTA ===');
-    console.log('[1] A obter token para:', email);
-
     // 1. Obter o token antes de apagar
-    const { data: tokenData, error: fetchError } = await supabase
+    const { data: tokenData } = await supabase
       .from('user_oauth_tokens')
-      .select('access_token, refresh_token, scopes')
+      .select('access_token')
       .eq('id', accountId)
       .single();
 
-    if (fetchError) {
-      console.error('[1] Erro ao obter token:', fetchError);
-    } else {
-      console.log('[1] Token obtido. Scopes guardados:', tokenData?.scopes);
-    }
-
-    // 2. Revogar token no Google (força nova autorização com novos scopes)
+    // 2. Revogar token no Google
     let revokeSuccess = false;
     if (tokenData?.access_token) {
       try {
-        console.log('[2] A revogar token no Google...');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
         const revokeResponse = await fetch(`https://oauth2.googleapis.com/revoke?token=${tokenData.access_token}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          signal: controller.signal,
         });
 
-        console.log('[2] Resposta revogação:', revokeResponse.status, revokeResponse.statusText);
-
-        if (revokeResponse.ok) {
-          console.log('[2] ✅ Token revogado com SUCESSO no Google para', email);
-          revokeSuccess = true;
-        } else {
-          const errorText = await revokeResponse.text();
-          console.warn('[2] ⚠️ Revogação falhou:', errorText);
-          // Token pode já estar expirado/inválido, o que não é problema
-        }
-      } catch (e) {
-        console.warn('[2] ⚠️ Erro de rede ao revogar (continuando):', e);
+        clearTimeout(timeoutId);
+        revokeSuccess = revokeResponse.ok;
+      } catch {
+        // Continue mesmo se revogar falhar
       }
-    } else {
-      console.log('[2] Sem access_token para revogar');
     }
 
     // 3. Apagar da base de dados
-    console.log('[3] A apagar da base de dados...');
     const { error } = await supabase
       .from('user_oauth_tokens')
       .delete()
       .eq('id', accountId);
 
     if (error) {
-      console.error('[3] Erro ao apagar da DB:', error);
-      toast.error('Erro ao remover conta');
+      toast.error('Erro ao remover conta. Tente novamente.');
     } else {
-      console.log('[3] ✅ Conta removida da base de dados');
       toast.success(
         revokeSuccess
-          ? 'Conta removida e acesso revogado no Google. Ao reconectar, novas permissões serão pedidas.'
+          ? 'Conta removida e acesso revogado no Google.'
           : 'Conta removida. Ao reconectar, novas permissões serão pedidas.'
       );
       fetchData();
     }
-    console.log('=== FIM REMOVER CONTA ===');
   };
 
   const handleSetPrimaryStorage = async (accountId: string, email: string) => {

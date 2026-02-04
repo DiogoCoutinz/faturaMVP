@@ -6,32 +6,34 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { FileText, Lock, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/features/auth/AuthContext';
 
-const VALID_USERNAME = 'francisco';
-const VALID_PASSWORD = 'Francisco10!';
+// Domínio interno para converter username em email
+const EMAIL_DOMAIN = '@faturasai.local';
 
 export default function SimpleLogin() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { signInWithEmail } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simular delay de autenticação
-    setTimeout(() => {
-      if (username === VALID_USERNAME && password === VALID_PASSWORD) {
-        localStorage.setItem('faturasai_logged_in', 'true');
-        localStorage.setItem('faturasai_user', username);
-        toast.success('Bem-vindo, ' + username + '!');
-        navigate('/');
-      } else {
-        toast.error('Credenciais inválidas');
-      }
-      setIsLoading(false);
-    }, 500);
+    // Converte username para email interno
+    const email = username.includes('@') ? username : `${username.toLowerCase()}${EMAIL_DOMAIN}`;
+    const { error } = await signInWithEmail(email, password);
+
+    if (error) {
+      toast.error(error);
+    } else {
+      toast.success('Bem-vindo!');
+      navigate('/');
+    }
+
+    setIsLoading(false);
   };
 
   return (
@@ -59,6 +61,7 @@ export default function SimpleLogin() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="pl-10"
+                  autoComplete="username"
                   required
                 />
               </div>
@@ -74,6 +77,7 @@ export default function SimpleLogin() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"
+                  autoComplete="current-password"
                   required
                 />
               </div>

@@ -36,6 +36,34 @@ export function FaturasTable({ faturas, onViewDetail }: FaturasTableProps) {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [currentPage, setCurrentPage] = useState(1);
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
+
+  // Keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent, index: number, fatura: Invoice) => {
+    switch (e.key) {
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        onViewDetail(fatura);
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        setFocusedIndex(Math.min(index + 1, paginatedFaturas.length - 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setFocusedIndex(Math.max(index - 1, 0));
+        break;
+    }
+  };
+
+  // Focus the row when focusedIndex changes
+  useEffect(() => {
+    if (focusedIndex !== null) {
+      const row = document.querySelector(`[data-row-index="${focusedIndex}"]`) as HTMLElement;
+      row?.focus();
+    }
+  }, [focusedIndex]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-PT", {
@@ -232,11 +260,16 @@ export function FaturasTable({ faturas, onViewDetail }: FaturasTableProps) {
               </TableCell>
             </TableRow>
           ) : (
-            paginatedFaturas.map((fatura) => (
-              <TableRow 
-                key={fatura.id} 
-                className="hover:bg-muted/30 transition-colors cursor-pointer group"
+            paginatedFaturas.map((fatura, index) => (
+              <TableRow
+                key={fatura.id}
+                data-row-index={index}
+                tabIndex={0}
+                role="button"
+                aria-label={`Ver detalhes de ${fatura.supplier_name}, ${formatCurrency(Number(fatura.total_amount) || 0)}`}
+                className="hover:bg-muted/30 transition-colors cursor-pointer group focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset"
                 onClick={() => onViewDetail(fatura)}
+                onKeyDown={(e) => handleKeyDown(e, index, fatura)}
               >
                 <TableCell className="font-medium text-muted-foreground">
                   {fatura.doc_date ? format(new Date(fatura.doc_date), "dd/MM/yyyy", { locale: pt }) : "—"}

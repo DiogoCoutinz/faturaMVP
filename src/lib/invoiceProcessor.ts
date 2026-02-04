@@ -38,39 +38,19 @@ export async function processInvoiceUpload(
     }
 
     // Verificar scopes do token ANTES de começar o processamento
-    console.log('[processInvoiceUpload] A verificar scopes do token...');
     const tokenInfo = await getTokenInfo(accessToken);
     if (tokenInfo) {
-      console.log('[processInvoiceUpload] Scopes:', tokenInfo.scopes);
-      console.log('[processInvoiceUpload] Email:', tokenInfo.email);
-
       const hasDriveScope = tokenInfo.scopes.some(
         s => s === 'https://www.googleapis.com/auth/drive' ||
              s === 'https://www.googleapis.com/auth/drive.file'
-      );
-      const hasSheetsScope = tokenInfo.scopes.some(
-        s => s === 'https://www.googleapis.com/auth/spreadsheets'
       );
 
       if (!hasDriveScope) {
         return {
           success: false,
-          error: `Token sem permissão de Google Drive. Scopes atuais: [${tokenInfo.scopes.join(', ')}]. ` +
-                 `Vá a https://myaccount.google.com/permissions, remova o acesso desta app, e reconecte a conta em Automações.`
+          error: 'Token sem permissão de Google Drive. Vá a Automações, remova a conta e reconecte para obter as permissões necessárias.'
         };
       }
-
-      // drive.file é limitado - só funciona com ficheiros criados pela app
-      if (tokenInfo.scopes.includes('https://www.googleapis.com/auth/drive.file') &&
-          !tokenInfo.scopes.includes('https://www.googleapis.com/auth/drive')) {
-        console.warn('[processInvoiceUpload] AVISO: Token com drive.file (limitado) em vez de drive (completo)');
-      }
-
-      if (!hasSheetsScope) {
-        console.warn('[processInvoiceUpload] AVISO: Token sem permissão de Google Sheets');
-      }
-    } else {
-      console.warn('[processInvoiceUpload] Não foi possível verificar scopes do token');
     }
 
     const base64Data = await fileToBase64(file);
@@ -94,42 +74,47 @@ export async function processInvoiceUpload(
       }
     }
 
-    let isDuplicate = false;
+    let duplicateInfo: { id: string; doc_number?: string } | null = null;
 
     // VERIFICAÇÃO 1: Se tem doc_number, verificar se já existe fatura com MESMO doc_number
     if (geminiData.doc_number) {
       const { data: docDups } = await supabase
         .from('invoices')
-        .select('id')
-        .ilike('doc_number', geminiData.doc_number);
-      if (docDups && docDups.length > 0) isDuplicate = true;
+        .select('id, doc_number')
+        .ilike('doc_number', geminiData.doc_number)
+        .limit(1);
+      if (docDups && docDups.length > 0) {
+        duplicateInfo = { id: docDups[0].id, doc_number: docDups[0].doc_number };
+      }
     }
 
     // VERIFICAÇÃO 2: Se não tem doc_number, verificar por fornecedor + data + valor + summary
-    // Isto evita falsos positivos quando há múltiplas faturas do mesmo fornecedor no mesmo dia
-    if (!isDuplicate && !geminiData.doc_number) {
+    if (!duplicateInfo && !geminiData.doc_number) {
       const { data: fieldDups } = await supabase
         .from('invoices')
         .select('id, summary')
         .ilike('supplier_name', geminiData.supplier_name || '')
         .eq('doc_date', geminiData.doc_date)
         .eq('total_amount', geminiData.total_amount)
-        .is('doc_number', null);  // Só comparar com faturas que também não têm doc_number
+        .is('doc_number', null)
+        .limit(5);
 
-      // Só é duplicado se também tiver o mesmo summary (ou ambos vazios)
       if (fieldDups && fieldDups.length > 0) {
-        const summaryMatch = fieldDups.some(dup =>
+        const summaryMatch = fieldDups.find(dup =>
           (dup.summary || '').toLowerCase().trim() === (geminiData.summary || '').toLowerCase().trim()
         );
-        if (summaryMatch) isDuplicate = true;
+        if (summaryMatch) {
+          duplicateInfo = { id: summaryMatch.id };
+        }
       }
     }
 
-    if (isDuplicate) {
+    if (duplicateInfo) {
+      const valor = geminiData.total_amount?.toFixed(2) || '0.00';
       return {
         success: false,
         isDuplicate: true,
-        error: `Esta fatura já existe no sistema (${geminiData.supplier_name} - ${geminiData.doc_date})`,
+        error: `Fatura duplicada: ${geminiData.supplier_name} - ${geminiData.doc_date} (${valor}€)${duplicateInfo.doc_number ? ` | Doc: ${duplicateInfo.doc_number}` : ''}. Verifique na página de Faturas.`,
       };
     }
 

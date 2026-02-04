@@ -25,7 +25,32 @@ interface StorageAccount {
 }
 
 const MAX_FILES = 10;
+const RATE_LIMIT_MAX = 10; // Max uploads per minute
+const RATE_LIMIT_WINDOW = 60000; // 1 minute in ms
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+
+// Rate limiting tracker (persists across re-renders)
+const uploadTimestamps: number[] = [];
+
+function checkRateLimit(): { allowed: boolean; waitSeconds: number } {
+  const now = Date.now();
+  // Remove timestamps older than the window
+  while (uploadTimestamps.length > 0 && uploadTimestamps[0] < now - RATE_LIMIT_WINDOW) {
+    uploadTimestamps.shift();
+  }
+
+  if (uploadTimestamps.length >= RATE_LIMIT_MAX) {
+    const oldestInWindow = uploadTimestamps[0];
+    const waitMs = (oldestInWindow + RATE_LIMIT_WINDOW) - now;
+    return { allowed: false, waitSeconds: Math.ceil(waitMs / 1000) };
+  }
+
+  return { allowed: true, waitSeconds: 0 };
+}
+
+function recordUpload() {
+  uploadTimestamps.push(Date.now());
+}
 
 export function UploadZone() {
   const { user } = useAuth();
@@ -37,6 +62,7 @@ export function UploadZone() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [showCameraWarning, setShowCameraWarning] = useState(false);
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const abortRef = useRef(false);
   const processingRef = useRef(false);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -143,17 +169,19 @@ export function UploadZone() {
         try {
           const result = await processInvoiceUpload(statuses[i].file, user?.id || null, storageToken);
 
+          recordUpload(); // Track for rate limiting
+
           if (result.success && result.invoice) {
             setFileStatuses(prev => prev.map((f, idx) =>
               idx === i ? { ...f, status: 'success', message: 'Processado!', invoice: result.invoice } : f
             ));
           } else if (result.isDuplicate) {
             setFileStatuses(prev => prev.map((f, idx) =>
-              idx === i ? { ...f, status: 'duplicate', message: 'Duplicado' } : f
+              idx === i ? { ...f, status: 'duplicate', message: result.error || 'Fatura duplicada' } : f
             ));
           } else {
             setFileStatuses(prev => prev.map((f, idx) =>
-              idx === i ? { ...f, status: 'error', message: result.error || 'Erro' } : f
+              idx === i ? { ...f, status: 'error', message: result.error || 'Erro ao processar' } : f
             ));
           }
         } catch (error) {
@@ -174,6 +202,14 @@ export function UploadZone() {
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
+
+    // Rate limit check
+    const rateCheck = checkRateLimit();
+    if (!rateCheck.allowed) {
+      setRateLimitError(`Limite de uploads atingido. Aguarde ${rateCheck.waitSeconds} segundos.`);
+      return;
+    }
+    setRateLimitError(null);
 
     if (!storageAccount) {
       setFileStatuses([{
@@ -254,6 +290,7 @@ export function UploadZone() {
     processingRef.current = false;
     setFileStatuses([]);
     setCurrentIndex(0);
+    setRateLimitError(null);
   };
 
   const completedCount = fileStatuses.filter(f => f.status === 'success').length;
@@ -306,6 +343,29 @@ export function UploadZone() {
                   </Button>
                 </Link>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* RATE LIMIT ERROR */}
+      {rateLimitError && (
+        <Card className="border-orange-200 bg-orange-50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-orange-600 shrink-0" />
+              <div className="flex-1">
+                <p className="font-medium text-orange-800">Limite de uploads atingido</p>
+                <p className="text-sm text-orange-700">{rateLimitError}</p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-orange-300 text-orange-700 hover:bg-orange-100"
+                onClick={() => setRateLimitError(null)}
+              >
+                Entendi
+              </Button>
             </div>
           </CardContent>
         </Card>

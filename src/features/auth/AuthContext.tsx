@@ -7,16 +7,18 @@ interface AuthContextType {
   session: Session | null
   loading: boolean
   signInWithGoogle: () => Promise<void>
+  signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   hasGoogleScopes: boolean // Verifica se o user tem permissões do Google
   providerToken: string | null // Token do Google para APIs
 }
 
-const AuthContext = createContext<AuthContextType>({ 
-  user: null, 
+const AuthContext = createContext<AuthContextType>({
+  user: null,
   session: null,
   loading: true,
   signInWithGoogle: async () => {},
+  signInWithEmail: async () => ({ error: null }),
   signOut: async () => {},
   hasGoogleScopes: false,
   providerToken: null,
@@ -99,6 +101,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  /**
+   * Login com Email/Password
+   * Usado para acesso simples à app (não precisa de Google OAuth)
+   */
+  const signInWithEmail = async (email: string, password: string): Promise<{ error: string | null }> => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          return { error: 'Credenciais inválidas. Verifique o email e password.' }
+        }
+        if (error.message.includes('Email not confirmed')) {
+          return { error: 'Email não confirmado. Contacte o administrador.' }
+        }
+        return { error: error.message }
+      }
+
+      return { error: null }
+    } catch {
+      return { error: 'Erro de conexão. Tente novamente.' }
+    }
+  }
+
   const signOut = async () => {
     await supabase.auth.signOut()
     setProviderToken(null)
@@ -106,16 +135,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Verifica se o user tem os scopes do Google (provider = 'google')
   const hasGoogleScopes = !!(
-    session?.user?.app_metadata?.provider === 'google' && 
+    session?.user?.app_metadata?.provider === 'google' &&
     providerToken
   )
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      session, 
-      loading, 
+    <AuthContext.Provider value={{
+      user,
+      session,
+      loading,
       signInWithGoogle,
+      signInWithEmail,
       signOut,
       hasGoogleScopes,
       providerToken,

@@ -12,22 +12,25 @@
  */
 export async function getTokenInfo(accessToken: string): Promise<{ scopes: string[]; email?: string } | null> {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
     const response = await fetch(
-      `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${accessToken}`
+      `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${accessToken}`,
+      { signal: controller.signal }
     );
+
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      console.error('[TokenInfo] Erro:', response.status);
       return null;
     }
     const data = await response.json();
-    console.log('[TokenInfo] Scopes do token:', data.scope);
-    console.log('[TokenInfo] Email:', data.email);
     return {
       scopes: data.scope?.split(' ') || [],
       email: data.email,
     };
-  } catch (error) {
-    console.error('[TokenInfo] Erro ao verificar token:', error);
+  } catch {
     return null;
   }
 }
@@ -41,13 +44,13 @@ export async function ensureFolder(
     throw new Error('Token de acesso não fornecido para criar pasta');
   }
 
-  // Log para debug - verificar scopes do token
-  console.log('[ensureFolder] A procurar pasta:', folderName, parentId ? `em ${parentId}` : '(raiz)');
-
   let query = `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`;
   if (parentId) {
     query += ` and '${parentId}' in parents`;
   }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
   const searchResponse = await fetch(
     `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`,
@@ -55,12 +58,14 @@ export async function ensureFolder(
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      signal: controller.signal,
     }
   );
 
+  clearTimeout(timeoutId);
+
   if (!searchResponse.ok) {
     const errorText = await searchResponse.text();
-    console.error('[ensureFolder] ERRO na API Drive:', searchResponse.status, errorText);
 
     // Se for erro de scopes, verificar e dar mensagem clara
     if (searchResponse.status === 403 && errorText.includes('SCOPE_INSUFFICIENT')) {

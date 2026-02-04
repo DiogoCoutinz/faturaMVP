@@ -56,30 +56,32 @@ export function useTokenRefresh(): TokenRefreshState {
         const needsRefresh = expiryTime < now.getTime() + bufferMs;
 
         if (needsRefresh && account.refresh_token) {
-          console.log(`[TokenRefresh] A renovar token para ${account.email}...`);
-
           try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
             const response = await fetch(`${SUPABASE_URL}/functions/v1/refresh-token`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ email: account.email }),
+              signal: controller.signal,
             });
 
+            clearTimeout(timeoutId);
+
             if (response.ok) {
-              const result = await response.json();
-              console.log(`[TokenRefresh] ✓ Token renovado para ${account.email}`, result);
               refreshedCount++;
             } else {
               const result = await response.json();
-              console.warn(`[TokenRefresh] ✗ Falha ao renovar ${account.email}:`, result.error);
-              lastError = result.error;
+              lastError = result.error || 'Falha ao renovar token';
             }
           } catch (error) {
-            console.error(`[TokenRefresh] ✗ Erro ao renovar ${account.email}:`, error);
-            lastError = String(error);
+            if (error instanceof Error && error.name === 'AbortError') {
+              lastError = 'Timeout ao renovar token. Verifique a sua conexão.';
+            } else {
+              lastError = 'Erro de rede ao renovar token';
+            }
           }
-        } else {
-          console.log(`[TokenRefresh] Token válido para ${account.email}`);
         }
       }
 
