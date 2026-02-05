@@ -4,6 +4,17 @@
  * Docs: https://developers.google.com/drive/api/v3/reference
  */
 
+import { driveLimiter } from '@/lib/rateLimiter';
+
+const DRIVE_TIMEOUT_MS = 30_000;
+const DRIVE_UPLOAD_TIMEOUT_MS = 120_000;
+
+function createTimeoutSignal(ms: number): { signal: AbortSignal; clear: () => void } {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ms);
+  return { signal: controller.signal, clear: () => clearTimeout(timeoutId) };
+}
+
 /**
  * FASE 3: Encontra ou cria uma pasta (com parent opcional)
  */
@@ -43,6 +54,8 @@ export async function ensureFolder(
   if (!accessToken) {
     throw new Error('Token de acesso não fornecido para criar pasta');
   }
+
+  await driveLimiter.waitForSlot();
 
   let query = `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed=false`;
   if (parentId) {
@@ -134,12 +147,13 @@ export async function moveFile(
   newParentId: string
 ): Promise<boolean> {
   try {
+    await driveLimiter.waitForSlot();
+    const t1 = createTimeoutSignal(DRIVE_TIMEOUT_MS);
     const getResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files/${fileId}?fields=parents`,
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }
+      { headers: { Authorization: `Bearer ${accessToken}` }, signal: t1.signal }
     );
+    t1.clear();
 
     if (!getResponse.ok) {
       return false;
@@ -148,13 +162,13 @@ export async function moveFile(
     const fileData = await getResponse.json();
     const previousParents = fileData.parents?.join(',') || '';
 
+    await driveLimiter.waitForSlot();
+    const t2 = createTimeoutSignal(DRIVE_TIMEOUT_MS);
     const moveResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files/${fileId}?addParents=${newParentId}&removeParents=${previousParents}`,
-      {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }
+      { method: 'PATCH', headers: { Authorization: `Bearer ${accessToken}` }, signal: t2.signal }
     );
+    t2.clear();
 
     return moveResponse.ok;
   } catch {
@@ -170,16 +184,14 @@ export async function checkFileExists(
   fileName: string,
   parentId: string
 ): Promise<string | null> {
+  await driveLimiter.waitForSlot();
   const query = `name='${fileName}' and '${parentId}' in parents and trashed=false`;
-
+  const t = createTimeoutSignal(DRIVE_TIMEOUT_MS);
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
+    { headers: { Authorization: `Bearer ${accessToken}` }, signal: t.signal }
   );
+  t.clear();
 
   if (!response.ok) {
     throw new Error(`Erro ao verificar ficheiro: ${response.status}`);
@@ -204,6 +216,8 @@ export async function copyFile(
   destinationFolderId: string
 ): Promise<{ id: string; webViewLink: string } | null> {
   try {
+    await driveLimiter.waitForSlot();
+    const t = createTimeoutSignal(DRIVE_TIMEOUT_MS);
     const response = await fetch(
       `https://www.googleapis.com/drive/v3/files/${sourceFileId}/copy`,
       {
@@ -216,8 +230,10 @@ export async function copyFile(
           name: newName,
           parents: [destinationFolderId],
         }),
+        signal: t.signal,
       }
     );
+    t.clear();
 
     if (!response.ok) {
       return null;
@@ -252,6 +268,8 @@ export async function createNewSpreadsheet(
     'Link PDF', 'Data Processamento'
   ];
 
+  await driveLimiter.waitForSlot();
+  const ct = createTimeoutSignal(DRIVE_TIMEOUT_MS);
   const createResponse = await fetch(
     'https://sheets.googleapis.com/v4/spreadsheets',
     {
@@ -264,8 +282,10 @@ export async function createNewSpreadsheet(
         properties: { title },
         sheets: sheets.map(name => ({ properties: { title: name } })),
       }),
+      signal: ct.signal,
     }
   );
+  ct.clear();
 
   if (!createResponse.ok) {
     const error = await createResponse.text();
@@ -278,15 +298,13 @@ export async function createNewSpreadsheet(
   await setupSpreadsheetHeaders(accessToken, spreadsheetId, headers);
 
   try {
+    await driveLimiter.waitForSlot();
+    const mt = createTimeoutSignal(DRIVE_TIMEOUT_MS);
     const moveResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?addParents=${parentFolderId}&fields=id,parents,webViewLink`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
+      { method: 'PATCH', headers: { Authorization: `Bearer ${accessToken}` }, signal: mt.signal }
     );
+    mt.clear();
 
     if (moveResponse.ok) {
       const moveData = await moveResponse.json();
@@ -362,16 +380,18 @@ export async function uploadInvoiceToDrive(
   );
   form.append('file', blob);
 
+  await driveLimiter.waitForSlot();
+  const ut = createTimeoutSignal(DRIVE_UPLOAD_TIMEOUT_MS);
   const response = await fetch(
     'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,webContentLink',
     {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { Authorization: `Bearer ${accessToken}` },
       body: form,
+      signal: ut.signal,
     }
   );
+  ut.clear();
 
   if (!response.ok) {
     const error = await response.text();

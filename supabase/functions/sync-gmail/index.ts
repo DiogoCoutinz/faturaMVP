@@ -9,6 +9,16 @@ const N8N_ERROR_WEBHOOK = Deno.env.get("N8N_ERROR_WEBHOOK") || "";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+const API_TIMEOUT_MS = 30_000;
+const GEMINI_TIMEOUT_MS = 120_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
+
+function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs: number = API_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+}
+
 interface OAuthToken {
   id: string;
   user_id: string;
@@ -55,7 +65,7 @@ interface GeminiInvoiceData {
 
 async function refreshGoogleToken(refreshToken: string): Promise<{ access_token: string; expires_in: number } | null> {
   try {
-    const response = await fetch("https://oauth2.googleapis.com/token", {
+    const response = await fetchWithTimeout("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -115,7 +125,7 @@ async function listUnreadInvoices(accessToken: string, maxResults: number = 20):
   }
   const messages: GmailMessage[] = [];
   for (const msg of data.messages) {
-    const details = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/" + msg.id, {
+    const details = await fetchWithTimeout("https://gmail.googleapis.com/gmail/v1/users/me/messages/" + msg.id, {
       headers: { Authorization: "Bearer " + accessToken },
     });
     if (details.ok) {
@@ -135,7 +145,7 @@ async function listUnreadInvoices(accessToken: string, maxResults: number = 20):
 }
 
 async function getEmailAttachments(accessToken: string, messageId: string): Promise<GmailAttachment[]> {
-  const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/" + messageId, {
+  const response = await fetchWithTimeout("https://gmail.googleapis.com/gmail/v1/users/me/messages/" + messageId, {
     headers: { Authorization: "Bearer " + accessToken },
   });
   if (!response.ok) {
@@ -184,7 +194,7 @@ async function getAttachmentData(accessToken: string, messageId: string, attachm
 }
 
 async function markEmailAsRead(accessToken: string, messageId: string): Promise<void> {
-  await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/" + messageId + "/modify", {
+  await fetchWithTimeout("https://gmail.googleapis.com/gmail/v1/users/me/messages/" + messageId + "/modify", {
     method: "POST",
     headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
     body: JSON.stringify({ removeLabelIds: ["UNREAD"] }),
@@ -207,7 +217,7 @@ CASO ESPECIAL IRN (Registo Predial Online):
 Responde APENAS com JSON: {is_valid_document: boolean, document_type: fatura|recibo|outro|null, cost_type: custo_fixo|custo_variavel|null, doc_year: number|null, doc_date: YYYY-MM-DD|null, supplier_name: string|null, supplier_vat: string|null, doc_number: string|null, total_amount: number|null, summary: string|null, confidence_score: number}`;
 
 async function analyzeWithGemini(pdfBase64: string, mimeType: string): Promise<GeminiInvoiceData> {
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GEMINI_API_KEY,
     {
       method: "POST",
@@ -215,7 +225,8 @@ async function analyzeWithGemini(pdfBase64: string, mimeType: string): Promise<G
       body: JSON.stringify({
         contents: [{ parts: [{ text: GEMINI_PROMPT }, { inlineData: { mimeType: mimeType, data: pdfBase64 } }, { text: "Analisa este documento." }] }],
       }),
-    }
+    },
+    GEMINI_TIMEOUT_MS
   );
   if (!response.ok) {
     throw new Error("Gemini API error: " + response.status);
@@ -231,14 +242,14 @@ async function ensureFolder(accessToken: string, folderName: string, parentId: s
   if (parentId) {
     query += " and '" + parentId + "' in parents";
   }
-  const searchResponse = await fetch("https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(query) + "&fields=files(id)", {
+  const searchResponse = await fetchWithTimeout("https://www.googleapis.com/drive/v3/files?q=" + encodeURIComponent(query) + "&fields=files(id)", {
     headers: { Authorization: "Bearer " + accessToken },
   });
   const searchData = await searchResponse.json();
   if (searchData.files?.length > 0) {
     return searchData.files[0].id;
   }
-  const createResponse = await fetch("https://www.googleapis.com/drive/v3/files", {
+  const createResponse = await fetchWithTimeout("https://www.googleapis.com/drive/v3/files", {
     method: "POST",
     headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
     body: JSON.stringify({ name: folderName, mimeType: "application/vnd.google-apps.folder", parents: parentId ? [parentId] : undefined }),
@@ -261,11 +272,11 @@ async function uploadToDrive(accessToken: string, fileData: Uint8Array, fileName
     "\r\n--" + boundary + "\r\nContent-Type: application/pdf\r\nContent-Transfer-Encoding: base64\r\n\r\n" +
     base64Data +
     "\r\n--" + boundary + "--";
-  const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", {
+  const response = await fetchWithTimeout("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", {
     method: "POST",
     headers: { Authorization: "Bearer " + accessToken, "Content-Type": "multipart/related; boundary=\"" + boundary + "\"" },
     body: multipartBody,
-  });
+  }, UPLOAD_TIMEOUT_MS);
   const result = await response.json();
   return { id: result.id, webViewLink: result.webViewLink || "https://drive.google.com/file/d/" + result.id + "/view" };
 }
@@ -419,7 +430,7 @@ async function syncAccountEmails(
 async function sendErrorsToN8n(errors: Array<{ account: string; errors: string[] }>): Promise<void> {
   if (!N8N_ERROR_WEBHOOK || errors.length === 0) return;
   try {
-    await fetch(N8N_ERROR_WEBHOOK, {
+    await fetchWithTimeout(N8N_ERROR_WEBHOOK, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ timestamp: new Date().toISOString(), type: "sync_errors", errors: errors }),

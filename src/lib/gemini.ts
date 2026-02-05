@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { geminiLimiter } from '@/lib/rateLimiter';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+const GEMINI_TIMEOUT_MS = 120_000;
 
 if (!GEMINI_API_KEY) {
   throw new Error('VITE_GEMINI_API_KEY não configurada no .env');
@@ -121,7 +123,7 @@ export async function analyzeInvoiceWithGemini(
   mimeType: string
 ): Promise<GeminiInvoiceData> {
   try {
-    // Usar modelo Gemini 2.5 Pro (mais potente para análise de imagem)
+    await geminiLimiter.waitForSlot();
     const model = getGenAI().getGenerativeModel({
       model: 'gemini-2.5-pro'
     });
@@ -133,10 +135,16 @@ export async function analyzeInvoiceWithGemini(
       },
     };
 
-    const result = await model.generateContent([
-      SYSTEM_PROMPT,
-      imagePart,
-      'Analisa este documento e devolve o JSON conforme o formato especificado.'
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Tempo limite excedido ao analisar documento. Tente novamente.')), GEMINI_TIMEOUT_MS)
+    );
+    const result = await Promise.race([
+      model.generateContent([
+        SYSTEM_PROMPT,
+        imagePart,
+        'Analisa este documento e devolve o JSON conforme o formato especificado.'
+      ]),
+      timeoutPromise,
     ]);
 
     const response = await result.response;

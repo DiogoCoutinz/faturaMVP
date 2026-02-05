@@ -3,6 +3,16 @@
  * Usa fetch direto para escrever em Sheets
  */
 
+import { sheetsLimiter } from '@/lib/rateLimiter';
+
+const SHEETS_TIMEOUT_MS = 30_000;
+
+function createTimeoutSignal(ms: number): { signal: AbortSignal; clear: () => void } {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ms);
+  return { signal: controller.signal, clear: () => clearTimeout(timeoutId) };
+}
+
 export const MONTH_SHEET_NAMES = [
   '01_Janeiro',
   '02_Fevereiro',
@@ -69,6 +79,8 @@ export async function appendInvoiceToSheet(
 
   const range = `${sheetName}!A2:J`;
 
+  await sheetsLimiter.waitForSlot();
+  const t = createTimeoutSignal(SHEETS_TIMEOUT_MS);
   const response = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`,
     {
@@ -77,11 +89,11 @@ export async function appendInvoiceToSheet(
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        values: [row],
-      }),
+      body: JSON.stringify({ values: [row] }),
+      signal: t.signal,
     }
   );
+  t.clear();
 
   if (!response.ok) {
     const error = await response.text();
@@ -98,6 +110,8 @@ export async function appendRowToSheet(
   range: string,
   values: Array<string | number | null>
 ): Promise<void> {
+  await sheetsLimiter.waitForSlot();
+  const t1 = createTimeoutSignal(SHEETS_TIMEOUT_MS);
   const response = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`,
     {
@@ -106,11 +120,11 @@ export async function appendRowToSheet(
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        values: [values],
-      }),
+      body: JSON.stringify({ values: [values] }),
+      signal: t1.signal,
     }
   );
+  t1.clear();
 
   if (!response.ok) {
     const error = await response.text();
@@ -127,6 +141,8 @@ export async function appendMultipleRows(
   range: string,
   rows: Array<Array<string | number | null>>
 ): Promise<void> {
+  await sheetsLimiter.waitForSlot();
+  const t2 = createTimeoutSignal(SHEETS_TIMEOUT_MS);
   const response = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`,
     {
@@ -135,11 +151,11 @@ export async function appendMultipleRows(
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        values: rows,
-      }),
+      body: JSON.stringify({ values: rows }),
+      signal: t2.signal,
     }
   );
+  t2.clear();
 
   if (!response.ok) {
     const error = await response.text();

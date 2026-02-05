@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/features/auth/AuthContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "./pages/NotFound";
 import Faturas from "./pages/Faturas";
 import Upload from "./pages/Upload";
@@ -62,10 +63,10 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<PublicRoute><SimpleLogin /></PublicRoute>} />
 
-      <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
-      <Route path="/faturas" element={<RequireAuth><Faturas /></RequireAuth>} />
-      <Route path="/upload" element={<RequireAuth><Upload /></RequireAuth>} />
-      <Route path="/automations" element={<RequireAuth><Automations /></RequireAuth>} />
+      <Route path="/" element={<RequireAuth><ErrorBoundary fallbackTitle="Erro no Dashboard"><Dashboard /></ErrorBoundary></RequireAuth>} />
+      <Route path="/faturas" element={<RequireAuth><ErrorBoundary fallbackTitle="Erro nas Faturas"><Faturas /></ErrorBoundary></RequireAuth>} />
+      <Route path="/upload" element={<RequireAuth><ErrorBoundary fallbackTitle="Erro no Upload"><Upload /></ErrorBoundary></RequireAuth>} />
+      <Route path="/automations" element={<RequireAuth><ErrorBoundary fallbackTitle="Erro nas Automações"><Automations /></ErrorBoundary></RequireAuth>} />
 
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />

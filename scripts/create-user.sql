@@ -8,7 +8,7 @@
 --
 -- CREDENCIAIS DE LOGIN:
 --   Utilizador: francisco
---   Password: Francisco10!
+--   Password: CHANGE_ME_BEFORE_RUNNING
 --
 -- (internamente guardado como francisco@faturasai.local)
 
@@ -54,7 +54,7 @@ VALUES (
   'authenticated',
   'authenticated',
   'francisco@faturasai.local',
-  crypt('Francisco10!', gen_salt('bf')),
+  crypt('CHANGE_ME_BEFORE_RUNNING', gen_salt('bf')),
   NOW(), -- email_confirmed_at (auto-confirmado)
   NULL,
   '',
