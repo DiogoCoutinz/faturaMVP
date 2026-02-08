@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     const clientSecret = Deno.env.get("GOOGLE_CLIENT_SECRET");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://faturamvp.vercel.app";
+    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://fatura-mvp.vercel.app";
 
     if (!clientId || !clientSecret) {
       console.error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET");
@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error("OAuth callback error:", error);
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://faturamvp.vercel.app";
+    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://fatura-mvp.vercel.app";
     return redirectWithError(frontendUrl, "Erro interno");
   }
 });
