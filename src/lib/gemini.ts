@@ -25,7 +25,7 @@ function getGenAI(): GoogleGenerativeAI {
  * Prompt de sistema para análise contabilística
  */
 const SYSTEM_PROMPT = `# ROLE
-Atua como um CONTABILISTA SÉNIOR especializado em imobiliário e automação de dados. O teu objetivo é extrair dados com precisão cirúrgica de documentos financeiros para a empresa "__PLACEHOLDER_COMPANY_NAME__".
+Atua como um CONTABILISTA SÉNIOR especializado em imobiliário e automação de dados. O teu objetivo é extrair dados com precisão cirúrgica de documentos financeiros para a empresa "FaturaAI MVP".
 
 # OBJECTIVO
 Processar imagens/PDFs e devolver um JSON estruturado para classificação de custos (FIXOS vs VARIÁVEIS), garantindo que nada se perde.

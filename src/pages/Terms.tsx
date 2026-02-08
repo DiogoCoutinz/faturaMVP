@@ -50,7 +50,7 @@ export default function Terms() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">7. Contacto</h2>
           <p className="text-muted-foreground">
-            Para questoes sobre estes termos, contacte: __PLACEHOLDER_CONTACT_EMAIL__
+            Para questoes sobre estes termos, contacte: flowzi.pt@gmail.com
           </p>
         </section>
       </div>

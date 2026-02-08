@@ -45,7 +45,7 @@ export default function SimpleLogin() {
               <FileText className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl">__PLACEHOLDER_TEAM_NAME__</CardTitle>
+          <CardTitle className="text-2xl">FaturaAI MVP</CardTitle>
           <CardDescription>Gestão de Faturas AI</CardDescription>
         </CardHeader>
         <CardContent>

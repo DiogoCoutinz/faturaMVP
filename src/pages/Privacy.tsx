@@ -43,7 +43,7 @@ export default function Privacy() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">6. Contacto</h2>
           <p className="text-muted-foreground">
-            Para questoes relacionadas com privacidade, contacte: __PLACEHOLDER_CONTACT_EMAIL__
+            Para questoes relacionadas com privacidade, contacte: flowzi.pt@gmail.com
           </p>
         </section>
       </div>
