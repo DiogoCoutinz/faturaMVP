@@ -52,11 +52,11 @@ class RateLimiter {
   }
 }
 
-// Gemini: 10 requests por minuto (generous, API limit is higher but protects quota)
-export const geminiLimiter = new RateLimiter({ maxRequests: 10, windowMs: 60_000 });
+// Gemini Tier 2: 1000+ RPM, mas no frontend nao precisas de tanto - 60/min e muito confortavel
+export const geminiLimiter = new RateLimiter({ maxRequests: 60, windowMs: 60_000 });
 
-// Google Drive: 20 requests por minuto
-export const driveLimiter = new RateLimiter({ maxRequests: 20, windowMs: 60_000 });
+// Google Drive: 12000 queries/min na quota padrao, 100/min e mais que suficiente
+export const driveLimiter = new RateLimiter({ maxRequests: 100, windowMs: 60_000 });
 
-// Google Sheets: 20 requests por minuto
-export const sheetsLimiter = new RateLimiter({ maxRequests: 20, windowMs: 60_000 });
+// Google Sheets: 300 requests/min na quota padrao, 100/min da folga
+export const sheetsLimiter = new RateLimiter({ maxRequests: 100, windowMs: 60_000 });

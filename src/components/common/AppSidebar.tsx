@@ -133,7 +133,7 @@ export function AppSidebar({ isCollapsed, onToggle, isMobile, isMobileMenuOpen }
               <Building2 className="h-5 w-5 text-primary-foreground" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-sm font-bold leading-tight text-sidebar-accent-foreground truncate">Equipa Francisco Brito</h1>
+              <h1 className="text-sm font-bold leading-tight text-sidebar-accent-foreground truncate">__PLACEHOLDER_TEAM_NAME__</h1>
               <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/60 font-medium truncate">Gestão de Faturas</p>
             </div>
           </div>

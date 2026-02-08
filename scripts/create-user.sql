@@ -7,10 +7,10 @@
 -- O utilizador é auto-confirmado (não precisa verificar email)
 --
 -- CREDENCIAIS DE LOGIN:
---   Utilizador: francisco
---   Password: CHANGE_ME_BEFORE_RUNNING
+--   Utilizador: __PLACEHOLDER_USERNAME__
+--   Password: __PLACEHOLDER_PASSWORD__
 --
--- (internamente guardado como francisco@faturasai.local)
+-- (internamente guardado como __PLACEHOLDER_USERNAME__@faturasai.local)
 
 -- Criar o utilizador
 INSERT INTO auth.users (
@@ -53,8 +53,8 @@ VALUES (
   gen_random_uuid(),
   'authenticated',
   'authenticated',
-  'francisco@faturasai.local',
-  crypt('CHANGE_ME_BEFORE_RUNNING', gen_salt('bf')),
+  '__PLACEHOLDER_USERNAME__@faturasai.local',
+  crypt('__PLACEHOLDER_PASSWORD__', gen_salt('bf')),
   NOW(), -- email_confirmed_at (auto-confirmado)
   NULL,
   '',
@@ -66,7 +66,7 @@ VALUES (
   NULL,
   NULL,
   '{"provider": "email", "providers": ["email"]}',
-  '{"name": "Francisco"}',
+  '{"name": "__PLACEHOLDER_DISPLAY_NAME__"}',
   FALSE,
   NOW(),
   NOW(),
@@ -105,9 +105,9 @@ SELECT
   NOW(),
   NOW()
 FROM auth.users
-WHERE email = 'francisco@faturasai.local';
+WHERE email = '__PLACEHOLDER_USERNAME__@faturasai.local';
 
 -- Verificar se o utilizador foi criado
 SELECT id, email, email_confirmed_at, created_at
 FROM auth.users
-WHERE email = 'francisco@faturasai.local';
+WHERE email = '__PLACEHOLDER_USERNAME__@faturasai.local';

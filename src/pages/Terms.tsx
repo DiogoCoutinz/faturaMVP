@@ -8,7 +8,7 @@ export default function Terms() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">1. Descricao do Servico</h2>
           <p className="text-muted-foreground">
-            O Flowzi e uma plataforma de gestao automatizada de faturas que utiliza inteligencia artificial para extrair, organizar e arquivar documentos fiscais. O servico integra-se com o Google Drive, Google Sheets e Gmail do utilizador.
+            O FaturaAI e uma plataforma de gestao automatizada de faturas que utiliza inteligencia artificial para extrair, organizar e arquivar documentos fiscais. O servico integra-se com o Google Drive, Google Sheets e Gmail do utilizador.
           </p>
         </section>
 
@@ -29,14 +29,14 @@ export default function Terms() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">4. Dados e Propriedade</h2>
           <p className="text-muted-foreground">
-            O utilizador mantem total propriedade sobre os seus dados e documentos. O Flowzi nao reivindica qualquer direito sobre o conteudo submetido. Os ficheiros permanecem no Google Drive do utilizador.
+            O utilizador mantem total propriedade sobre os seus dados e documentos. O FaturaAI nao reivindica qualquer direito sobre o conteudo submetido. Os ficheiros permanecem no Google Drive do utilizador.
           </p>
         </section>
 
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">5. Limitacao de Responsabilidade</h2>
           <p className="text-muted-foreground">
-            O servico e fornecido "tal como esta". A analise por IA pode conter imprecisoes - o utilizador deve sempre verificar os dados extraidos. O Flowzi nao se responsabiliza por erros na categorizacao automatica ou extracao de dados.
+            O servico e fornecido "tal como esta". A analise por IA pode conter imprecisoes - o utilizador deve sempre verificar os dados extraidos. O FaturaAI nao se responsabiliza por erros na categorizacao automatica ou extracao de dados.
           </p>
         </section>
 
@@ -50,7 +50,7 @@ export default function Terms() {
         <section className="space-y-3">
           <h2 className="text-xl font-semibold">7. Contacto</h2>
           <p className="text-muted-foreground">
-            Para questoes sobre estes termos, contacte: flowzi.pt@gmail.com
+            Para questoes sobre estes termos, contacte: __PLACEHOLDER_CONTACT_EMAIL__
           </p>
         </section>
       </div>
